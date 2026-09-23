@@ -22,29 +22,44 @@ export function uniqueName(base: string): string {
 
 /** Resets the server's in-memory state so each test starts clean. */
 export async function resetServer(): Promise<void> {
+	console.error("[dbg] resetServer: begin");
 	await fetch(`${BASE}/api/reset`, { method: "POST" });
+	console.error("[dbg] resetServer: done");
 }
 
 export async function login(page: Page, name: string): Promise<void> {
+	console.error("[dbg] login: goto");
 	await page.goto(BASE);
+	console.error("[dbg] login: fill");
 	await page.locator("input").fill(name);
+	console.error("[dbg] login: submit");
 	await page.getByRole("button", { name: /List Games/i }).click();
+	console.error("[dbg] login: waitForURL");
 	await page.waitForURL("**/dashboard");
+	console.error("[dbg] login: done");
 }
 
 export async function createGame(page: Page): Promise<string> {
+	console.error("[dbg] createGame: click");
 	await page.getByRole("button", { name: /Create Game/i }).click();
+	console.error("[dbg] createGame: waitForURL");
 	await page.waitForURL(/\/games\/[0-9a-f-]+/);
+	console.error("[dbg] createGame: done");
 	return page.url().split("/").pop() as string;
 }
 
 export async function joinFirstOpenGame(page: Page): Promise<void> {
+	console.error("[dbg] joinFirstOpenGame: click");
 	await page.getByRole("button", { name: /^Join$/ }).click();
+	console.error("[dbg] joinFirstOpenGame: waitForURL");
 	await page.waitForURL(/\/games\/[0-9a-f-]+/);
+	console.error("[dbg] joinFirstOpenGame: done");
 }
 
 export async function waitForBoard(page: Page): Promise<void> {
+	console.error("[dbg] waitForBoard: begin");
 	await page.locator("canvas").first().waitFor();
+	console.error("[dbg] waitForBoard: done");
 }
 
 /** Maps a logical board point to viewport pixel coordinates. */

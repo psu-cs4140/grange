@@ -8,6 +8,10 @@ import {
 	waitForBoard,
 } from "./helpers";
 
+test.beforeEach(({}, testInfo) => {
+	console.error(`[dbg] ===== START ${testInfo.title}`);
+});
+
 test("Leave works from the dashboard via SPA navigation", async ({ browser }) => {
 	await resetServer();
 	const aName = uniqueName("Alice");

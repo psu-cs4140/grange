@@ -8,6 +8,10 @@ import {
 	waitForBoard,
 } from "./helpers";
 
+test.beforeEach(({}, testInfo) => {
+	console.error(`[dbg] ===== START ${testInfo.title}`);
+});
+
 test("login, create, join, then the game appears on the dashboard", async ({
 	browser,
 }) => {
@@ -29,10 +33,13 @@ test("login, create, join, then the game appears on the dashboard", async ({
 	await waitForBoard(bob);
 
 	await alice.goto("http://localhost:3000/dashboard");
+	console.error("[dbg] lobby1: goto dashboard done");
 	await expect(alice.getByText(`#${gameId.slice(0, 8)}`)).toBeVisible();
-
+	console.error("[dbg] lobby1: game visible");
 	await ctxA.close();
+	console.error("[dbg] lobby1: ctxA closed");
 	await ctxB.close();
+	console.error("[dbg] lobby1: ctxB closed");
 });
 
 test("a player can delete the game from the dashboard", async ({ browser }) => {

@@ -24,6 +24,10 @@ interface Setup {
 	gameId: string;
 }
 
+test.beforeEach(({}, testInfo) => {
+	console.error(`[dbg] ===== START ${testInfo.title}`);
+});
+
 async function setupGame(browser: Browser): Promise<Setup> {
 	console.error("[dbg] setupGame: begin");
 	await resetServer();
@@ -334,7 +338,9 @@ test("fresh deploy game: both players can interact (__grange)", async ({ browser
 test("action cards play, animate, and both players can act again", async ({ browser }) => {
 	let s: Setup | null = null;
 	for (let attempt = 0; attempt < 10; attempt++) {
+		console.error(`[dbg] test10 attempt ${attempt}: setupGame`);
 		s = await setupGame(browser);
+		console.error(`[dbg] test10 attempt ${attempt}: setup done`);
 		const pageErrors: string[] = [];
 		for (const page of [s.alice, s.bob]) {
 			page.on("pageerror", (e) => pageErrors.push(String(e)));
@@ -349,6 +355,7 @@ test("action cards play, animate, and both players can act again", async ({ brow
 		await s.watcher.waitFor((g) => g?.phase === "action");
 		await waitForPagePhase(s.alice, "action");
 		await waitForPagePhase(s.bob, "action");
+		console.error(`[dbg] test10 attempt ${attempt}: action phase reached`);
 
 		// Stun actions target the opponent; repair and damage target the player's own bot.
 		const aHand = s.watcher.getState()?.players.find((p) => p.name === s.aliceName)?.hand ?? [];
@@ -356,6 +363,7 @@ test("action cards play, animate, and both players can act again", async ({ brow
 		const aAction = aHand.findIndex((card) => card.type === "action");
 		const bAction = bHand.findIndex((card) => card.type === "action");
 		if (aAction < 0 && bAction < 0) {
+			console.error(`[dbg] test10 attempt ${attempt}: no actions, retry`);
 			await cleanup(s);
 			s = null;
 			continue;
@@ -406,6 +414,7 @@ test("action cards play, animate, and both players can act again", async ({ brow
 		await s.watcher.waitFor((g) => g?.turn === 2 && g?.phase === "deploy");
 		await waitForPagePhase(s.alice, "deploy");
 		await waitForPagePhase(s.bob, "deploy");
+		console.error(`[dbg] test10 attempt ${attempt}: turn 2 deploy reached`);
 
 		// Regression: interaction is not stuck after the play animations.
 		for (const page of [s.alice, s.bob]) {
