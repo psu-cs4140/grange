@@ -25,6 +25,7 @@ interface Setup {
 }
 
 async function setupGame(browser: Browser): Promise<Setup> {
+	console.error("[dbg] setupGame: begin");
 	await resetServer();
 	for (let attempt = 0; attempt < 10; attempt++) {
 		const aliceName = uniqueName("Alice");
@@ -59,6 +60,7 @@ async function setupGame(browser: Browser): Promise<Setup> {
 			const aP = g.players.find((p) => p.name === aliceName);
 			const bP = g.players.find((p) => p.name === bobName);
 			if (aP && bP && aP.hand.some((c) => c.type === "bot") && bP.hand.some((c) => c.type === "bot")) {
+				console.error("[dbg] setupGame: returning");
 				return { alice, bob, watcher, aliceName, bobName, gameId };
 			}
 
@@ -146,9 +148,13 @@ async function assertBoardsDeployed(
 }
 
 async function cleanup(s: Setup): Promise<void> {
+	console.error("[dbg] cleanup: closing watcher");
 	s.watcher.close();
+	console.error("[dbg] cleanup: closing alice context");
 	await s.alice.context().close();
+	console.error("[dbg] cleanup: closing bob context");
 	await s.bob.context().close();
+	console.error("[dbg] cleanup: done");
 }
 
 test("both players can CLICK-deploy a bot", async ({ browser }) => {
@@ -321,6 +327,7 @@ test("fresh deploy game: both players can interact (__grange)", async ({ browser
 		expect(st.hand).toContain("bot");
 	}
 
+	console.error("[dbg] test9: asserts done, cleaning up");
 	await cleanup(s);
 });
 
