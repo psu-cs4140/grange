@@ -120,15 +120,23 @@ export class GameWatcher {
 		return this.state;
 	}
 
-	async waitFor(pred: (g: Game | null) => boolean): Promise<Game> {
+	async waitFor(
+		pred: (g: Game | null) => boolean,
+		timeoutMs = 30_000,
+	): Promise<Game> {
 		if (this.state && pred(this.state)) return this.state;
-		return new Promise((resolve) => {
+		return new Promise((resolve, reject) => {
 			const l = () => {
 				if (this.state && pred(this.state)) {
+					clearTimeout(timer);
 					this.listeners.delete(l);
 					resolve(this.state as Game);
 				}
 			};
+			const timer = setTimeout(() => {
+				this.listeners.delete(l);
+				reject(new Error("GameWatcher.waitFor timed out"));
+			}, timeoutMs);
 			this.listeners.add(l);
 		});
 	}

@@ -1,5 +1,4 @@
 import type { KonvaEventObject } from "konva/lib/Node";
-import type { Stage as KonvaStage } from "konva/lib/Stage";
 import { useEffect, useRef, useState } from "react";
 import { Group, Layer, Rect, Stage, Text } from "react-konva";
 import type { Game, GameCard, GameEvent, Submission } from "../../shared/types";
@@ -61,7 +60,6 @@ export default function GameBoard({
 	onScrapHand?: () => void;
 }) {
 	const containerRef = useRef<HTMLDivElement>(null);
-	const stageRef = useRef<KonvaStage | null>(null);
 	const [size, setSize] = useState({ width: 0, height: 0 });
 
 	useEffect(() => {
@@ -74,37 +72,6 @@ export default function GameBoard({
 		});
 		observer.observe(containerRef.current);
 		return () => observer.disconnect();
-	}, []);
-
-	// Debug: log pointer events (capture phase, so it fires even if a browser
-	// extension such as Brave Shields stops propagation downstream) with the
-	// Konva node under the cursor.
-	useEffect(() => {
-		const onPointer = (e: PointerEvent) => {
-			const stage = stageRef.current;
-			if (!stage) return;
-			const container = stage.container();
-			if (!container) return;
-			const r = container.getBoundingClientRect();
-			const pos = { x: e.clientX - r.left, y: e.clientY - r.top };
-			let hit = "none";
-			try {
-				const node = stage.getIntersection(pos) as {
-					getType?: () => string;
-					name?: () => string;
-				} | null;
-				hit = node
-					? `${node.getType?.() ?? "?"}${node.name?.() ? `:${node.name()}` : ""}`
-					: "none";
-			} catch {
-				hit = "none";
-			}
-			console.log(
-				`[pointer] type=${e.type} screen=(${e.clientX},${e.clientY}) hit=${hit}`,
-			);
-		};
-		window.addEventListener("pointerdown", onPointer, true);
-		return () => window.removeEventListener("pointerdown", onPointer, true);
 	}, []);
 
 	const palette = getPalette();
@@ -173,7 +140,7 @@ export default function GameBoard({
 	return (
 		<div ref={containerRef} className="relative h-full w-full overflow-hidden">
 			{size.width > 0 && scale > 0 && (
-				<Stage ref={stageRef} width={size.width} height={size.height}>
+				<Stage width={size.width} height={size.height}>
 					<Layer>
 						<Group x={offsetX} y={offsetY} scaleX={scale} scaleY={scale}>
 							<Rect
