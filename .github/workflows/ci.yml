@@ -28,33 +28,30 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
+      - name: Install Playwright (chromium)
+        run: pnpm exec playwright install --with-deps chromium
+
       - name: Lint, unit tests, build
         run: pnpm check
 
-      # E2E is temporarily disabled while the CI-only hang is being
-      # investigated locally. Restore the steps below once it is fixed.
-      #
-      # - name: Cache Playwright browsers
-      #   uses: actions/cache@v4
-      #   with:
-      #     path: ~/.cache/ms-playwright
-      #     key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
-      #     restore-keys: |
-      #       ${{ runner.os }}-playwright-
-      #
-      # - name: Install Playwright (chromium)
-      #   run: pnpm exec playwright install --with-deps chromium
-      #
-      # - name: End-to-end tests
-      #   run: pnpm test:e2e
-      #
-      # - name: Upload Playwright report
-      #   if: ${{ !cancelled() }}
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: playwright-report
-      #     path: playwright-report/
-      #     retention-days: 7
+      - name: End-to-end tests
+        run: pnpm test:e2e
+
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
 
   secrets:
     runs-on: ubuntu-latest
