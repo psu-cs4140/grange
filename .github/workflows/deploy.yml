@@ -10,15 +10,25 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  DEPLOY_HOST: ettin.homework.quest
   DEPLOY_USER: grange
   DEPLOY_PATH: /home/grange/grange
   APP_PORT: "3200"
 
 jobs:
   deploy:
+    strategy:
+      fail-fast: false
+      matrix:
+        deploy_host:
+          - ettin.homework.quest
+          - grangegame.com
+
+    env:
+      DEPLOY_HOST: ${{ matrix.deploy_host }}
+
     runs-on: ubuntu-latest
     timeout-minutes: 15
+
     steps:
       - uses: actions/checkout@v4
 
