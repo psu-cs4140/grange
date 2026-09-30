@@ -16,7 +16,7 @@ export default function Login() {
 		emitLogin(trimmed, (res) => {
 			if (res.ok) {
 				setUsername(trimmed);
-				navigate("/dashboard");
+				navigate("/world");
 			} else {
 				setError(res.error ?? "Login failed");
 			}
@@ -46,7 +46,7 @@ export default function Login() {
 						type="submit"
 						className="rounded border border-barn-red/60 bg-barn-red/10 px-4 py-2 font-display text-sm font-bold uppercase tracking-wider text-barn-red transition hover:bg-barn-red/20 ember-glow"
 					>
-						List Games
+						Enter Farm
 					</button>
 					{error && <p className="text-center text-sm text-pumpkin">{error}</p>}
 				</form>
