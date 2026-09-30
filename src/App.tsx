@@ -7,7 +7,7 @@ import FarmMap from "./world/FarmMap";
 export default function App() {
 	return (
 		<Routes>
-			<Route path="/" element={<Login />} />
+			<Route path="/" element={<FarmMap />} />
 			<Route path="/dashboard" element={<Dashboard />} />
 			<Route path="/games/:uuid" element={<Game />} />
 			<Route path="/world" element={<FarmMap />} />
