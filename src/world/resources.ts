@@ -9,8 +9,8 @@ export const image = (path: string) =>
 export const terrainImage = image("farm/terrain.webp");
 export const trainImage = image("transport/starter-train.webp");
 
-export const sproutImage = image("plants/sprout.webp");
-export const tomatoPlantImage = image("plants/tomato-plant.webp");
+export const sproutImage = image("farm/plants/sprout.webp");
+export const tomatoPlantImage = image("farm/plants/tomato-plant.webp");
 
 export const cropImages = {
 	sprout: sproutImage,
