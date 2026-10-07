@@ -71,7 +71,7 @@ defmodule Grange.FarmStoreTest do
     FarmStore.action("Alice", %{"kind" => "plant", "x" => 5, "y" => 5})
     FarmStore.action("Alice", %{"kind" => "water", "x" => 5, "y" => 5})
 
-    future = System.monotonic_time(:millisecond) + Farm.grow_ms() + 60_000
+    future = System.system_time(:millisecond) + Farm.grow_ms() + 60_000
     assert ["Alice"] = FarmStore.tick(future)
     assert %{state: :ready} = tile_at("Alice", 5, 5)
 
@@ -105,7 +105,7 @@ defmodule Grange.FarmStoreTest do
 
     GrangeWeb.Endpoint.subscribe("lobby")
 
-    future = System.monotonic_time(:millisecond) + Farm.grow_ms() + 60_000
+    future = System.system_time(:millisecond) + Farm.grow_ms() + 60_000
     assert Enum.sort(FarmStore.tick(future)) == ["Alice", "Bob", "Carol"]
 
     assert_receive %Phoenix.Socket.Broadcast{event: "farms"}

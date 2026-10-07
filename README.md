@@ -13,6 +13,15 @@ Elixir/Phoenix and talks to the SPA exclusively over Phoenix Channels.
 Then visit <http://localhost:3000/>. In development Vite serves the SPA on 3000
 and proxies `/socket` and `/api` to Phoenix on 3200.
 
+## Database
+
+Accounts, sessions, farms, and tiles are stored in SQLite via Ecto. There is no
+external database service to run: the app creates its database file and runs
+migrations automatically on boot. Development and test use
+`backend/priv/grange_dev.sqlite3` and `backend/priv/grange_test.sqlite3`;
+production uses `<release-root>/data/grange.sqlite3` (override with
+`DATABASE_PATH`).
+
 ## Tests
 
 - `pnpm test:backend` — Elixir unit + channel tests (ExUnit)
