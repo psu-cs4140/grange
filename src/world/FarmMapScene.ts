@@ -188,9 +188,6 @@ export class FarmMapScene extends ex.Scene {
 
 		updateWalkingPlayer(this.player, dir, this.playerSpeed);
 
-		// Smoothly lock camera to player
-		this.camera.pos = this.player.pos;
-
 		this.travel.update(this.player, this.inputManager, engine);
 
 		this.handleToolKeys();
