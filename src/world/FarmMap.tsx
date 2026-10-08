@@ -3,6 +3,10 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import type { FarmToolId } from "../../shared/farm";
 import { logout } from "../auth";
+import { Hud } from "../inventory/Hud";
+import { InventoryPanel } from "../inventory/InventoryPanel";
+import "../inventory/inventory.css";
+import { useInventoryKeys } from "../inventory/useInventoryKeys";
 import { emitLeaveFarm, emitVisitFarm } from "../socket";
 import { useGameStore } from "../store";
 import { CasinoScene } from "./CasinoScene";
@@ -41,6 +45,7 @@ const TOOL_BY_KEY: Record<string, FarmToolId> = {
 
 export default function FarmMap() {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
+	useInventoryKeys();
 	const sceneRef = useRef<FarmMapScene | null>(null);
 	const username = useGameStore((s) => s.username);
 	const farm = useGameStore((s) => s.activeFarm);
@@ -205,6 +210,8 @@ export default function FarmMap() {
 					</p>
 				</div>
 			)}
+			<Hud />
+			<InventoryPanel />
 		</main>
 	);
 }

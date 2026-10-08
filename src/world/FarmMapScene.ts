@@ -3,6 +3,7 @@ import type { FarmTileState, FarmToolId } from "../../shared/farm";
 import { isFarmInBounds } from "../../shared/farm";
 import { emitFarmAction } from "../socket";
 import { useGameStore } from "../store";
+import { isInventoryBlockingInput } from "../inventory/inventoryStore";
 import {
 	BlockRegistry,
 	decorByTile,
@@ -183,6 +184,12 @@ export class FarmMapScene extends ex.Scene {
 	}
 
 	override onPreUpdate(engine: ex.Engine, _delta: number): void {
+		// Freeze movement while the inventory modal captures input.
+		if (isInventoryBlockingInput()) {
+			this.player.vel = ex.vec(0, 0);
+			return;
+		}
+
 		// Poll input vector (normalized -1 to 1)
 		const dir = this.inputManager.getMovementVector();
 
