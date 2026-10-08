@@ -12,7 +12,9 @@ interface MenuButton {
 }
 
 export default function MainMenu() {
-	const { ready, signedIn } = useSession();
+	const { ready } = useSession();
+	const user = useGameStore((s) => s.user);
+	const signedIn = Boolean(user);
 	const username = useGameStore((s) => s.username);
 	const navigate = useNavigate();
 	const location = useLocation();
@@ -46,18 +48,7 @@ export default function MainMenu() {
 
 	return (
 		<main className="menu-root">
-			<div className="menu-art" aria-hidden="true">
-				<img
-					className="menu-art-barn"
-					src="/assets/farm/buildings/barn.webp"
-					alt=""
-				/>
-				<img
-					className="menu-art-train"
-					src="/assets/transport/starter-train.webp"
-					alt=""
-				/>
-			</div>
+			<div className="menu-art" aria-hidden="true" />
 
 			<header className="menu-topbar">
 				<h1 className="menu-logo" data-testid="menu-logo">

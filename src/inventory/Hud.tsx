@@ -6,7 +6,6 @@ import { Hotbar } from "./Hotbar";
 import { useInventoryStore } from "./inventoryStore";
 
 interface HudProps {
-	tomatoes: number;
 	tiles: number;
 	hovered: FarmHoveredTile | null;
 }
@@ -16,7 +15,7 @@ interface HudProps {
  * hotbar (center), the chat/notification feed (left), and the Grangecoin
  * wallet plus keyboard prompts (right).
  */
-export function Hud({ tomatoes, tiles, hovered }: HudProps) {
+export function Hud({ tiles, hovered }: HudProps) {
 	const openInventory = useInventoryStore((s) => s.setInventoryOpen);
 	const setPaused = usePauseStore((s) => s.setPaused);
 
@@ -28,7 +27,6 @@ export function Hud({ tomatoes, tiles, hovered }: HudProps) {
 
 			<div className="hud-bottom-center">
 				<div className="hud-status">
-					<span data-testid="farm-tomatoes">🍅 {tomatoes}</span>
 					<span data-testid="farm-map-tiles">{tiles} tiles</span>
 					<span data-testid="farm-tile">
 						{hovered

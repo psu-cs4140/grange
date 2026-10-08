@@ -1,17 +1,25 @@
 import { expect, test } from "@playwright/test";
 import {
 	BASE,
+	enterFarm,
 	login,
 	register,
+	registerAccount,
 	resetServer,
 	uniqueName,
-	waitForWorld,
 } from "./helpers";
 
-test("a new account can register and lands on the farm map", async ({ page }) => {
+test("a new account registers, lands on the main menu, then enters the farm", async ({
+	page,
+}) => {
 	await resetServer();
 	const name = uniqueName("Sprout");
-	await register(page, name);
+	await registerAccount(page, name);
+
+	await expect(page).toHaveURL(`${BASE}/`);
+	await expect(page.getByTestId("menu-user")).toContainText(name);
+
+	await enterFarm(page);
 	await expect(page).toHaveURL(/\/world$/);
 	await page.keyboard.press("Escape");
 	await expect(page.getByTestId("farm-map-user")).toContainText(name);
@@ -102,12 +110,10 @@ test("registration rejects a short password and a duplicate username", async ({
 
 	await page.getByTestId("password").fill("long-enough-pass");
 	await page.getByRole("button", { name: /Create Account/i }).click();
-	await page.waitForURL("**/world");
-	await waitForWorld(page);
-
-	await page.keyboard.press("Escape");
-	await page.getByTestId("logout").click();
 	await page.waitForURL(`${BASE}/`);
+	await page.getByTestId("menu-user").waitFor();
+
+	await page.getByTestId("menu-logout").click();
 	await page.getByTestId("menu-login").click();
 	await page.waitForURL("**/login");
 	await page.getByTestId("toggle-mode").click();

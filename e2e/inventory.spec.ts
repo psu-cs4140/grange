@@ -1,5 +1,11 @@
 import { expect, test } from "@playwright/test";
-import { register, resetServer, uniqueName } from "./helpers";
+import {
+	enterFarm,
+	register,
+	registerAccount,
+	resetServer,
+	uniqueName,
+} from "./helpers";
 
 test("HUD shows hotbar and prompts with a clear top screen", async ({
 	page,
@@ -93,3 +99,23 @@ test("Escape opens the pause menu and Resume closes it", async ({ page }) => {
 	await page.getByTestId("pause-resume").click();
 	await expect(page.getByTestId("pause-menu")).toHaveCount(0);
 });
+
+test("Quit to Main Menu keeps the session and returns to the menu", async ({
+	page,
+}) => {
+	await resetServer();
+	const name = uniqueName("Sprout");
+	await registerAccount(page, name);
+	await enterFarm(page);
+
+	await page.keyboard.press("Escape");
+	await page.getByTestId("pause-quit-menu").click();
+
+	await expect(page).toHaveURL("/");
+	await expect(page.getByTestId("menu-user")).toContainText(name);
+
+	// The session is intact, so Continue re-enters the farm.
+	await enterFarm(page);
+	await expect(page).toHaveURL(/\/world$/);
+});
+

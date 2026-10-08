@@ -39,7 +39,12 @@ test("farming loop: hoe, seed, bucket, grow, scythe", async ({ page }) => {
 	});
 	await page.keyboard.press("4");
 	await clickTile(page, 9, 7);
-	await expect(page.getByTestId("farm-tomatoes")).toContainText("3");
+	// Harvested tomatoes land in the physical inventory: hotbar slot 5 (tomato)
+	// grows from 5 to 8.
+	await expect(page.getByTestId("slot-hotbar-4")).toHaveAttribute(
+		"data-count",
+		"8",
+	);
 	await expect(page.getByTestId("farm-tile")).toContainText("(9, 7): tilled");
 
 	// Drag-paint tills two tiles at once

@@ -39,10 +39,12 @@ export default function FarmMap() {
 	const setTool = useGameStore((s) => s.setTool);
 	const selectedHotbar = useInventoryStore((s) => s.selectedHotbar);
 	const hotbar = useInventoryStore((s) => s.hotbar);
+	const addItem = useInventoryStore((s) => s.addItem);
 	const setInventoryOpen = useInventoryStore((s) => s.setInventoryOpen);
 	const pushNotice = useNotificationStore((s) => s.push);
 	const paused = usePauseStore((s) => s.paused);
 	const setPaused = usePauseStore((s) => s.setPaused);
+	const tomatoBaseline = useRef<number | null>(null);
 	const { owner } = useParams<{ owner?: string }>();
 	const navigate = useNavigate();
 	const [hud, setHud] = useState<FarmHudSnapshot>({
@@ -55,6 +57,8 @@ export default function FarmMap() {
 	const isOwner = target === username;
 
 	useEffect(() => {
+		// Re-baseline harvest tomatoes whenever the target farm changes.
+		tomatoBaseline.current = null;
 		if (!target) return;
 
 		emitVisitFarm(target, (res) => {
@@ -70,6 +74,20 @@ export default function FarmMap() {
 		const next = farmToolForItem(hotbar[selectedHotbar]?.itemId ?? null);
 		if (next) setTool(next);
 	}, [hotbar, selectedHotbar, setTool]);
+
+	// Harvested tomatoes become physical inventory items. The server keeps its
+	// own barn/lobby total; we mirror the positive delta for the owner into the
+	// inventory. The first snapshot of a farm only sets the baseline, so a
+	// reload doesn't re-bank the persisted server count.
+	const tomatoes = farm?.tomatoes ?? null;
+	useEffect(() => {
+		if (tomatoes === null || !isOwner) return;
+		const previous = tomatoBaseline.current;
+		tomatoBaseline.current = tomatoes;
+		if (previous === null) return;
+		const gained = tomatoes - previous;
+		if (gained > 0) addItem("tomato", gained);
+	}, [tomatoes, isOwner, addItem]);
 
 	const [area, setArea] = useState<WorldArea>("Farm");
 	const [travelPrompt, setTravelPrompt] = useState<string | null>(null);
@@ -163,11 +181,7 @@ export default function FarmMap() {
 					{travelPrompt}
 				</div>
 			)}
-			<Hud
-				tomatoes={hud.tomatoes}
-				tiles={farm?.tiles.length ?? 0}
-				hovered={hud.hovered}
-			/>
+			<Hud tiles={farm?.tiles.length ?? 0} hovered={hud.hovered} />
 			<InventoryPanel />
 			{paused && <PauseMenu />}
 			{blackjackOpen && <BlackjackOverlay onClose={closeBlackjack} />}

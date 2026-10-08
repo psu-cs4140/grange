@@ -22,11 +22,19 @@ export async function waitForWorld(page: Page): Promise<void> {
 	await page.waitForLoadState("networkidle");
 }
 
+/** Continues from the main menu into the farm and waits for it to be live. */
+export async function enterFarm(page: Page): Promise<void> {
+	await page.getByRole("button", { name: /Continue \/ Load Farm/i }).click();
+	await page.waitForURL("**/world");
+	await waitForWorld(page);
+}
+
 /**
- * Registers a fresh account through the UI and returns the user. `/api/reset`
- * wipes accounts too, so the username only has to be unique within a test.
+ * Registers a fresh account and leaves the page on the main menu, signed in.
+ * `/api/reset` wipes accounts too, so the username only has to be unique
+ * within a test.
  */
-export async function register(
+export async function registerAccount(
 	page: Page,
 	username: string,
 	password = "harvest-please",
@@ -37,8 +45,22 @@ export async function register(
 	await page.getByTestId("email").fill(`${username}@example.test`);
 	await page.getByTestId("password").fill(password);
 	await page.getByRole("button", { name: /Create Account/i }).click();
-	await page.waitForURL("**/world");
-	await waitForWorld(page);
+	await page.waitForURL(`${BASE}/`);
+	await page.getByTestId("menu-user").waitFor();
+	return username;
+}
+
+/**
+ * Registers a fresh account and continues into the farm, leaving the page on
+ * the farm map. Most tests start here.
+ */
+export async function register(
+	page: Page,
+	username: string,
+	password = "harvest-please",
+): Promise<string> {
+	await registerAccount(page, username, password);
+	await enterFarm(page);
 	return username;
 }
 
@@ -48,16 +70,15 @@ export async function login(
 	username: string,
 	password = "harvest-please",
 ): Promise<void> {
-	await register(page, username, password);
-	// Sign out via the pause menu, then sign back in from the login screen.
-	await page.keyboard.press("Escape");
-	await page.getByTestId("logout").click();
-	await page.waitForURL(`${BASE}/`);
+	await registerAccount(page, username, password);
+	// Sign out from the menu, then sign back in from the login screen.
+	await page.getByTestId("menu-logout").click();
 	await page.getByTestId("menu-login").click();
 	await page.waitForURL("**/login");
 	await page.getByTestId("username").fill(username);
 	await page.getByTestId("password").fill(password);
 	await page.getByRole("button", { name: /Sign In/i }).click();
-	await page.waitForURL("**/world");
-	await waitForWorld(page);
+	await page.waitForURL(`${BASE}/`);
+	await page.getByTestId("menu-user").waitFor();
+	await enterFarm(page);
 }

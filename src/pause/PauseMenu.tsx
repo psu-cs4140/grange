@@ -19,13 +19,20 @@ export function PauseMenu() {
 
 	if (!paused) return null;
 
-	async function quitToMenu() {
-		await logout();
-		navigate("/", { replace: true });
+	// Quitting to the menu keeps the session: the farm closes, the account
+	// stays signed in, and the menu's Continue re-enters the world.
+	function quitToMenu() {
+		setPaused(false);
+		navigate("/");
 	}
 
 	async function quitToDesktop() {
-		await logout();
+		try {
+			await logout();
+		} catch {
+			// A failed logout request must not strand the player in the world.
+			useGameStore.getState().clearUser();
+		}
 		navigate("/", {
 			replace: true,
 			state: { notice: "Signed out. You may now close this tab." },

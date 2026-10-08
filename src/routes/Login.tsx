@@ -38,7 +38,8 @@ export default function Login() {
 						});
 			if (res.ok && res.user) {
 				// login()/register() already stored the user and rebound the socket.
-				navigate("/world");
+				// Land on the main menu, signed in; Continue enters the farm.
+				navigate("/");
 				return;
 			}
 			// Stays on the main menu: nothing navigates without a server-issued session.
