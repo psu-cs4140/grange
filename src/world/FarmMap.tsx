@@ -12,6 +12,7 @@ import { InventoryPanel } from "../inventory/InventoryPanel";
 import "../inventory/inventory.css";
 import { useInventoryKeys } from "../inventory/useInventoryKeys";
 import { useInventoryStore } from "../inventory/inventoryStore";
+import { BlackjackOverlay } from "./BlackjackOverlay";
 import { CasinoScene } from "./CasinoScene";
 import { casinoResources } from "./casinoResources";
 import { FarmMapScene } from "./FarmMapScene";
@@ -31,6 +32,7 @@ export default function FarmMap() {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	useInventoryKeys();
 	const sceneRef = useRef<FarmMapScene | null>(null);
+	const casinoRef = useRef<CasinoScene | null>(null);
 	const username = useGameStore((s) => s.username);
 	const farm = useGameStore((s) => s.activeFarm);
 	const tool = useGameStore((s) => s.tool);
@@ -71,6 +73,7 @@ export default function FarmMap() {
 
 	const [area, setArea] = useState<WorldArea>("Farm");
 	const [travelPrompt, setTravelPrompt] = useState<string | null>(null);
+	const [blackjackOpen, setBlackjackOpen] = useState(false);
 
 	useEffect(() => {
 		const canvas = canvasRef.current;
@@ -95,7 +98,12 @@ export default function FarmMap() {
 			"marketplace",
 			new MarketplaceScene(setTravelPrompt, setArea),
 		);
-		engine.addScene("casino", new CasinoScene(setTravelPrompt, setArea));
+		const casino = new CasinoScene(setTravelPrompt, setArea, () => {
+			casino.setPaused(true);
+			setBlackjackOpen(true);
+		});
+		casinoRef.current = casino;
+		engine.addScene("casino", casino);
 		void Promise.all(worldResources.map((resource) => resource.load())).then(
 			async () => {
 				if (cancelled) return;
@@ -107,6 +115,7 @@ export default function FarmMap() {
 		return () => {
 			cancelled = true;
 			sceneRef.current = null;
+			casinoRef.current = null;
 			engine.stop();
 			engine.dispose();
 		};
@@ -137,6 +146,11 @@ export default function FarmMap() {
 		};
 	}, [setPaused, setInventoryOpen]);
 
+	function closeBlackjack() {
+		casinoRef.current?.setPaused(false);
+		setBlackjackOpen(false);
+	}
+
 	return (
 		<main className="farm-map-page">
 			<canvas
@@ -156,6 +170,7 @@ export default function FarmMap() {
 			/>
 			<InventoryPanel />
 			{paused && <PauseMenu />}
+			{blackjackOpen && <BlackjackOverlay onClose={closeBlackjack} />}
 		</main>
 	);
 }
