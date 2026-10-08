@@ -85,6 +85,23 @@ defmodule Grange.Accounts do
   @spec list_users() :: [User.t()]
   def list_users, do: Repo.all(from(u in User, order_by: u.username))
 
+  @spec apply_balance_delta(String.t(), integer()) ::
+          {:ok, non_neg_integer()} | {:error, String.t()}
+  def apply_balance_delta(user_id, delta) when is_integer(delta) do
+    case Repo.get(User, user_id) do
+      nil ->
+        {:error, "unknown user"}
+
+      %User{} = user ->
+        # Spend/earn delta, clamped at zero so a balance can never go negative.
+        balance = max(0, user.balance + delta)
+        user |> Ecto.Changeset.change(balance: balance) |> Repo.update!()
+        {:ok, balance}
+    end
+  end
+
+  def apply_balance_delta(_user_id, _delta), do: {:error, "delta must be an integer"}
+
   @spec reset() :: :ok
   def reset do
     Repo.delete_all(Session)

@@ -5,11 +5,14 @@ defmodule Grange.User do
 
   import Ecto.Changeset
 
+  @starting_balance 100
+
   @primary_key {:id, :string, autogenerate: false}
   schema "users" do
     field(:username, :string)
     field(:email, :string)
     field(:password_hash, :string)
+    field(:balance, :integer, default: @starting_balance)
     timestamps(type: :utc_datetime_usec, updated_at: false)
   end
 
@@ -18,17 +21,19 @@ defmodule Grange.User do
           username: String.t(),
           email: String.t(),
           password_hash: String.t(),
-          inserted_at: DateTime.t() | nil
+          inserted_at: DateTime.t() | nil,
+          balance: non_neg_integer()
         }
 
-  @doc "Builds a new (unsaved) user with a generated id."
+  @doc "Builds a new (unsaved) user with a generated id and opening balance."
   @spec new(map()) :: t()
   def new(attrs) do
     %__MODULE__{
       id: id(),
       username: attrs.username,
       email: attrs.email,
-      password_hash: attrs.password_hash
+      password_hash: attrs.password_hash,
+      balance: @starting_balance
     }
   end
 
@@ -60,7 +65,8 @@ defimpl Jason.Encoder, for: Grange.User do
         id: user.id,
         username: user.username,
         email: user.email,
-        inserted_at: iso8601(user.inserted_at)
+        inserted_at: iso8601(user.inserted_at),
+        balance: user.balance
       },
       opts
     )
