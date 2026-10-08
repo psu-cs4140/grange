@@ -1,12 +1,13 @@
+import type { FarmToolId } from "../../shared/farm";
+
 export type ItemId =
 	| "hoe"
 	| "watering-can"
 	| "scythe"
 	| "seed-bag"
-	| "tomato"
-	| "grangecoin";
+	| "tomato";
 
-export type ItemKind = "tool" | "seed" | "crop" | "currency";
+export type ItemKind = "tool" | "seed" | "crop";
 
 export interface ItemDef {
 	id: ItemId;
@@ -59,21 +60,31 @@ export const ITEMS: Record<ItemId, ItemDef> = {
 		icon: "/assets/farm/plants/tomato-plant.webp",
 		description: "Harvested crop. Sells for Grangecoin.",
 	},
-	grangecoin: {
-		id: "grangecoin",
-		name: "Grangecoin",
-		kind: "currency",
-		maxStack: 999,
-		icon: "🪙",
-		description: "Physical currency. Stackable, lives in slots.",
-	},
 };
 
 export function getItemDef(id: ItemId): ItemDef {
 	return ITEMS[id];
 }
 
-/** Grangecoin is intentionally an ordinary stackable item, not a counter. */
 export function isStackable(id: ItemId): boolean {
 	return ITEMS[id].maxStack > 1;
+}
+
+/**
+ * Maps a held inventory item to the farm action it performs. Selecting the
+ * matching hotbar slot makes the hotbar the single tool selector.
+ */
+export function farmToolForItem(itemId: ItemId | null): FarmToolId | null {
+	switch (itemId) {
+		case "hoe":
+			return "hoe";
+		case "seed-bag":
+			return "seed";
+		case "watering-can":
+			return "bucket";
+		case "scythe":
+			return "scythe";
+		default:
+			return null;
+	}
 }

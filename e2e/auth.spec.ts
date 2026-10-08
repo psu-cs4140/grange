@@ -1,27 +1,38 @@
 import { expect, test } from "@playwright/test";
-import { BASE, login, register, resetServer, uniqueName } from "./helpers";
+import {
+	BASE,
+	login,
+	register,
+	resetServer,
+	uniqueName,
+	waitForWorld,
+} from "./helpers";
 
 test("a new account can register and lands on the farm map", async ({ page }) => {
 	await resetServer();
 	const name = uniqueName("Sprout");
 	await register(page, name);
 	await expect(page).toHaveURL(/\/world$/);
+	await page.keyboard.press("Escape");
 	await expect(page.getByTestId("farm-map-user")).toContainText(name);
 });
 
-test("wrong credentials do not get past the main menu", async ({ page }) => {
+test("wrong credentials do not get past the login screen", async ({ page }) => {
 	await resetServer();
 	const name = uniqueName("Sprout");
 	await register(page, name);
 
+	await page.keyboard.press("Escape");
 	await page.getByTestId("logout").click();
 	await page.waitForURL(`${BASE}/`);
+	await page.getByTestId("menu-login").click();
+	await page.waitForURL("**/login");
 	await page.getByTestId("username").fill(name);
 	await page.getByTestId("password").fill("definitely-wrong");
 	await page.getByRole("button", { name: /Sign In/i }).click();
 
 	await expect(page.getByTestId("auth-error")).toBeVisible();
-	await expect(page).toHaveURL(`${BASE}/`);
+	await expect(page).toHaveURL(`${BASE}/login`);
 	await expect(page.getByRole("button", { name: /Sign In/i })).toBeVisible();
 });
 
@@ -29,7 +40,7 @@ test("an unknown username is rejected with the same generic message", async ({
 	page,
 }) => {
 	await resetServer();
-	await page.goto(BASE);
+	await page.goto(`${BASE}/login`);
 	await page.getByTestId("username").fill(uniqueName("Ghost"));
 	await page.getByTestId("password").fill("whatever-123");
 	await page.getByRole("button", { name: /Sign In/i }).click();
@@ -37,7 +48,7 @@ test("an unknown username is rejected with the same generic message", async ({
 	await expect(page.getByTestId("auth-error")).toContainText(
 		/invalid username or password/i,
 	);
-	await expect(page).toHaveURL(`${BASE}/`);
+	await expect(page).toHaveURL(`${BASE}/login`);
 });
 
 test("a session survives a page reload", async ({ page }) => {
@@ -47,6 +58,7 @@ test("a session survives a page reload", async ({ page }) => {
 
 	await page.reload();
 	await expect(page).toHaveURL(/\/world$/);
+	await page.keyboard.press("Escape");
 	await expect(page.getByTestId("farm-map-user")).toContainText(name);
 });
 
@@ -56,7 +68,7 @@ test("protected routes redirect to the main menu without a session", async ({
 	await resetServer();
 	await page.goto(`${BASE}/dashboard`);
 	await expect(page).toHaveURL(`${BASE}/`);
-	await expect(page.getByRole("button", { name: /Sign In/i })).toBeVisible();
+	await expect(page.getByTestId("menu-login")).toBeVisible();
 });
 
 test("signing out clears the session so protected routes close again", async ({
@@ -65,6 +77,7 @@ test("signing out clears the session so protected routes close again", async ({
 	await resetServer();
 	await login(page, uniqueName("Sprout"));
 
+	await page.keyboard.press("Escape");
 	await page.getByTestId("logout").click();
 	await page.waitForURL(`${BASE}/`);
 
@@ -78,26 +91,30 @@ test("registration rejects a short password and a duplicate username", async ({
 	await resetServer();
 	const name = uniqueName("Sprout");
 
-	await page.goto(BASE);
+	await page.goto(`${BASE}/login`);
 	await page.getByTestId("toggle-mode").click();
 	await page.getByTestId("username").fill(name);
 	await page.getByTestId("email").fill(`${name}@example.test`);
 	await page.getByTestId("password").fill("short");
 	await page.getByRole("button", { name: /Create Account/i }).click();
 	await expect(page.getByTestId("auth-error")).toContainText(/at least 8/i);
-	await expect(page).toHaveURL(`${BASE}/`);
+	await expect(page).toHaveURL(`${BASE}/login`);
 
 	await page.getByTestId("password").fill("long-enough-pass");
 	await page.getByRole("button", { name: /Create Account/i }).click();
 	await page.waitForURL("**/world");
+	await waitForWorld(page);
 
+	await page.keyboard.press("Escape");
 	await page.getByTestId("logout").click();
 	await page.waitForURL(`${BASE}/`);
+	await page.getByTestId("menu-login").click();
+	await page.waitForURL("**/login");
 	await page.getByTestId("toggle-mode").click();
 	await page.getByTestId("username").fill(name);
 	await page.getByTestId("email").fill(`other-${name}@example.test`);
 	await page.getByTestId("password").fill("long-enough-pass");
 	await page.getByRole("button", { name: /Create Account/i }).click();
 	await expect(page.getByTestId("auth-error")).toContainText(/username is taken/i);
-	await expect(page).toHaveURL(`${BASE}/`);
+	await expect(page).toHaveURL(`${BASE}/login`);
 });

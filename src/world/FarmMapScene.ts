@@ -28,7 +28,7 @@ import {
 import { propImages, terrainFrames, terrainImage } from "./resources";
 import { updateWalkingPlayer } from "./playerMovement";
 import type { FarmHoveredTile, FarmHudSnapshot } from "./farmHud";
-import { TOOL_HINTS, TOOL_KEYS, TOOL_KIND } from "./farmTools";
+import { TOOL_HINTS, TOOL_KIND } from "./farmTools";
 import { clearDecorAt, refreshTile } from "./tileSync";
 import type { WorldArea } from "./WalkingScene";
 
@@ -210,14 +210,8 @@ export class FarmMapScene extends ex.Scene {
 	}
 
 	private handleToolKeys(): void {
-		for (const [key, tool] of Object.entries(TOOL_KEYS)) {
-			if (this.inputManager.consumePressed(key)) {
-				useGameStore.getState().setTool(tool);
-				this.message = TOOL_HINTS[tool];
-				this.emitHud();
-			}
-		}
-
+		// Tool selection lives on the hotbar; this only handles the contextual
+		// action key that acts on the tile the player is standing on.
 		if (this.isOwner && this.inputManager.consumePressed("Space")) {
 			this.actOnPlayerTile();
 		}

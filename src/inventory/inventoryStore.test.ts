@@ -1,21 +1,26 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import {
-	countItem,
-	useInventoryStore,
-} from "./inventoryStore";
+import { countItem, useInventoryStore } from "./inventoryStore";
 
 beforeEach(() => {
 	useInventoryStore.getState().resetInventory();
 });
 
 describe("inventory slots", () => {
-	it("seeds a stub hotbar and physical Grangecoin stacks", () => {
+	it("seeds a stub hotbar and grid", () => {
 		const { hotbar, grid } = useInventoryStore.getState();
 		expect(hotbar).toHaveLength(10);
 		expect(grid).toHaveLength(24);
 		expect(hotbar[0]).toMatchObject({ itemId: "hoe", count: 1 });
-		expect(grid[0]?.itemId).toBe("grangecoin");
-		expect(countItem(useInventoryStore.getState(), "grangecoin")).toBe(165);
+		expect(grid[0]).toMatchObject({ itemId: "tomato", count: 12 });
+		expect(countItem(useInventoryStore.getState(), "tomato")).toBe(17);
+	});
+
+	it("keeps no currency item in slots", () => {
+		const items = [
+			...useInventoryStore.getState().grid,
+			...useInventoryStore.getState().hotbar,
+		].map((s) => s.itemId);
+		expect(items).not.toContain("grangecoin");
 	});
 
 	it("moves a stack into an empty slot", () => {
@@ -26,12 +31,13 @@ describe("inventory slots", () => {
 		expect(grid[10]).toMatchObject({ itemId: "hoe", count: 1 });
 	});
 
-	it("merges partial stacks up to maxStack and keeps the remainder", () => {
+	it("merges partial stacks of the same item", () => {
 		const { moveStack } = useInventoryStore.getState();
-		moveStack({ area: "grid", index: 1 }, { area: "grid", index: 0 });
-		const { grid } = useInventoryStore.getState();
-		expect(grid[0]).toMatchObject({ itemId: "grangecoin", count: 165 });
-		expect(grid[1]?.itemId).toBeNull();
+		// hotbar[1] is 10 seeds, grid[1] is 20 seeds.
+		moveStack({ area: "hotbar", index: 1 }, { area: "grid", index: 1 });
+		const { hotbar, grid } = useInventoryStore.getState();
+		expect(grid[1]).toMatchObject({ itemId: "seed-bag", count: 30 });
+		expect(hotbar[1]?.itemId).toBeNull();
 	});
 
 	it("swaps two different items", () => {
@@ -55,8 +61,8 @@ describe("inventory slots", () => {
 		const { splitHalf } = useInventoryStore.getState();
 		splitHalf({ area: "grid", index: 0 }, { area: "grid", index: 10 });
 		const { grid } = useInventoryStore.getState();
-		expect(grid[10]).toMatchObject({ itemId: "grangecoin", count: 60 });
-		expect(grid[0]).toMatchObject({ itemId: "grangecoin", count: 60 });
+		expect(grid[10]).toMatchObject({ itemId: "tomato", count: 6 });
+		expect(grid[0]).toMatchObject({ itemId: "tomato", count: 6 });
 	});
 
 	it("selects hotbar slots and toggles the panel", () => {

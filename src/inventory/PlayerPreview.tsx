@@ -1,20 +1,22 @@
+import { useEffect, useState } from "react";
+import { economy } from "../world/EconomyManager";
 import { getItemDef } from "./items";
-import { countItem, useInventoryStore } from "./inventoryStore";
+import { useInventoryStore } from "./inventoryStore";
 import { SlotIcon } from "./SlotIcon";
 
 /**
- * 2D stand-in for the wireframe's "3D preview". Shows a pixel-style
- * paper-doll (player color block from FarmMapScene) plus the currently
- * equipped hotbar item and a derived Grangecoin total. Grangecoin remains
- * physical — the total here is display-only aggregation, not a wallet.
+ * 2D stand-in for the wireframe's "3D preview": a pixel-style paper-doll
+ * (player color block from FarmMapScene) plus the currently equipped hotbar
+ * item and the Grangecoin wallet balance.
  */
 export function PlayerPreview() {
 	const hotbar = useInventoryStore((s) => s.hotbar);
 	const selectedHotbar = useInventoryStore((s) => s.selectedHotbar);
-	const grid = useInventoryStore((s) => s.grid);
 	const equipped = hotbar[selectedHotbar];
 	const equippedDef = equipped.itemId ? getItemDef(equipped.itemId) : null;
-	const coins = countItem({ grid, hotbar }, "grangecoin");
+	const [coins, setCoins] = useState(economy.getBalance());
+
+	useEffect(() => economy.subscribe(setCoins), []);
 
 	return (
 		<section aria-label="Player preview" className="inv-preview">
@@ -35,12 +37,12 @@ export function PlayerPreview() {
 					</dd>
 				</div>
 				<div>
-					<dt>Grangecoin (in slots)</dt>
-					<dd data-testid="preview-coins">{coins}</dd>
+					<dt>Grangecoin balance</dt>
+					<dd data-testid="preview-coins">{coins.toLocaleString()}</dd>
 				</div>
 			</dl>
 			<p className="inv-preview-note">
-				Coin has no wallet counter — it lives in slots like any stack.
+				Grangecoin is kept in your wallet, not in inventory slots.
 			</p>
 		</section>
 	);

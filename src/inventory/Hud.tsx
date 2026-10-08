@@ -1,44 +1,61 @@
-import { useNavigate } from "react-router-dom";
-import { logout } from "../auth";
-import { useGameStore } from "../store";
+import { NotificationFeed } from "../notifications/NotificationFeed";
+import { usePauseStore } from "../pause/pauseStore";
+import { EconomyHUD } from "../world/EconomyHUD";
+import type { FarmHoveredTile } from "../world/farmHud";
 import { Hotbar } from "./Hotbar";
 import { useInventoryStore } from "./inventoryStore";
 
-export function Hud() {
-	const username = useGameStore((s) => s.username);
-	const toggleInventory = useInventoryStore((s) => s.toggleInventory);
-	const navigate = useNavigate();
+interface HudProps {
+	tomatoes: number;
+	tiles: number;
+	hovered: FarmHoveredTile | null;
+}
 
-	async function onSignOut() {
-		await logout();
-		navigate("/", { replace: true });
-	}
+/**
+ * In-game HUD. The top of the screen stays clear; the bottom holds the
+ * hotbar (center), the chat/notification feed (left), and the Grangecoin
+ * wallet plus keyboard prompts (right).
+ */
+export function Hud({ tomatoes, tiles, hovered }: HudProps) {
+	const openInventory = useInventoryStore((s) => s.setInventoryOpen);
+	const setPaused = usePauseStore((s) => s.setPaused);
 
 	return (
 		<div className="hud-root">
+			<div className="hud-bottom-left">
+				<NotificationFeed />
+			</div>
+
 			<div className="hud-bottom-center">
+				<div className="hud-status">
+					<span data-testid="farm-tomatoes">🍅 {tomatoes}</span>
+					<span data-testid="farm-map-tiles">{tiles} tiles</span>
+					<span data-testid="farm-tile">
+						{hovered
+							? `(${hovered.column}, ${hovered.row}): ${hovered.state}`
+							: "—"}
+					</span>
+				</div>
 				<Hotbar />
 			</div>
+
 			<div className="hud-bottom-right">
-				<span className="hud-user" data-testid="farm-map-user">
-					{username}
-				</span>
+				<EconomyHUD />
 				<button
 					type="button"
 					data-testid="open-inventory"
 					className="hud-prompt"
-					onClick={toggleInventory}
+					onClick={() => openInventory(true)}
 				>
 					[I] Inventory
 				</button>
-				<span className="hud-prompt hud-prompt-static">[Esc] Close</span>
 				<button
 					type="button"
-					data-testid="logout"
-					onClick={onSignOut}
-					className="hud-signout"
+					data-testid="open-pause"
+					className="hud-prompt"
+					onClick={() => setPaused(true)}
 				>
-					Sign out
+					[Esc] Pause
 				</button>
 			</div>
 		</div>

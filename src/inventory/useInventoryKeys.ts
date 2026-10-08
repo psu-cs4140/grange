@@ -1,14 +1,16 @@
 import { useEffect } from "react";
+import { usePauseStore } from "../pause/pauseStore";
 import { useInventoryStore } from "./inventoryStore";
 
 /**
- * Global hotkeys for HUD/inventory. Coexists with InputManager, which only
- * tracks movement keys. Ignores keystrokes inside form fields.
+ * Global hotkeys for HUD/inventory/pause. Coexists with InputManager, which
+ * only tracks movement keys. Ignores keystrokes inside form fields.
  */
 export function useInventoryKeys(): void {
 	const selectHotbar = useInventoryStore((s) => s.selectHotbar);
 	const toggleInventory = useInventoryStore((s) => s.toggleInventory);
 	const setInventoryOpen = useInventoryStore((s) => s.setInventoryOpen);
+	const togglePause = usePauseStore((s) => s.togglePause);
 
 	useEffect(() => {
 		function isTypingTarget(target: EventTarget | null): boolean {
@@ -26,6 +28,19 @@ export function useInventoryKeys(): void {
 			if (e.metaKey || e.ctrlKey || e.altKey) return;
 			if (isTypingTarget(e.target)) return;
 
+			if (e.code === "Escape") {
+				e.preventDefault();
+				if (useInventoryStore.getState().inventoryOpen) {
+					setInventoryOpen(false);
+				} else {
+					togglePause();
+				}
+				return;
+			}
+
+			// Menus capture the rest: no tool selection while paused/opening UI.
+			if (usePauseStore.getState().paused) return;
+
 			if (/^Digit[0-9]$/.test(e.code) || /^Numpad[0-9]$/.test(e.code)) {
 				const digit = Number(
 					e.code.replace("Digit", "").replace("Numpad", ""),
@@ -37,19 +52,15 @@ export function useInventoryKeys(): void {
 
 			if (e.code === "KeyI") {
 				if (!e.repeat) toggleInventory();
-				return;
-			}
-
-			if (e.code === "Escape") {
-				const open = useInventoryStore.getState().inventoryOpen;
-				if (open) {
-					e.preventDefault();
-					setInventoryOpen(false);
-				}
 			}
 		}
 
 		window.addEventListener("keydown", onKeyDown);
 		return () => window.removeEventListener("keydown", onKeyDown);
-	}, [selectHotbar, toggleInventory, setInventoryOpen]);
+	}, [
+		selectHotbar,
+		toggleInventory,
+		setInventoryOpen,
+		togglePause,
+	]);
 }

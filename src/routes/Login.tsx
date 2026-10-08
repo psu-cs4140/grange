@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { login, register } from "../auth";
 
 type Mode = "signin" | "signup";
@@ -51,7 +51,13 @@ export default function Login() {
 	}
 
 	return (
-		<div className="flex min-h-screen items-center justify-center p-4">
+		<div className="flex min-h-screen flex-col items-center justify-center gap-4 p-4">
+			<Link
+				to="/"
+				className="text-xs tracking-widest text-husk underline-offset-2 hover:text-leaf hover:underline"
+			>
+				← Back to main menu
+			</Link>
 			<div className="w-full max-w-sm rounded-lg border border-plum/40 bg-barn p-8 ember-glow text-plum">
 				<h1 className="mb-1 text-center text-3xl text-barn-red ember-text">
 					GRANGE

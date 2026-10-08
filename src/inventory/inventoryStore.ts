@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { usePauseStore } from "../pause/pauseStore";
 import { ITEMS, type ItemId } from "./items";
 
 export const GRID_SIZE = 24;
@@ -26,10 +27,8 @@ function stack(itemId: ItemId, count: number): InventorySlot {
 
 function buildInitialGrid(): InventorySlot[] {
 	const grid = Array.from({ length: GRID_SIZE }, emptySlot);
-	grid[0] = stack("grangecoin", 120);
-	grid[1] = stack("grangecoin", 45);
-	grid[2] = stack("tomato", 12);
-	grid[3] = stack("seed-bag", 20);
+	grid[0] = stack("tomato", 12);
+	grid[1] = stack("seed-bag", 20);
 	return grid;
 }
 
@@ -195,9 +194,15 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
 		}),
 }));
 
-/** Excalibur scene polls this to freeze movement while the modal is open. */
+/**
+ * Excalibur scene polls this to freeze movement while an overlay captures
+ * input (inventory modal or pause menu).
+ */
 export function isInventoryBlockingInput(): boolean {
-	return useInventoryStore.getState().inventoryOpen;
+	return (
+		useInventoryStore.getState().inventoryOpen ||
+		usePauseStore.getState().paused
+	);
 }
 
 export function countItem(
