@@ -1,37 +1,62 @@
 import * as ex from "excalibur";
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import type { FarmToolId } from "../../shared/farm";
+import { logout } from "../auth";
+import { Hud } from "../inventory/Hud";
+import { InventoryPanel } from "../inventory/InventoryPanel";
+import { farmToolForItem } from "../inventory/items";
 import { useNotificationStore } from "../notifications/notificationStore";
 import { PauseMenu } from "../pause/PauseMenu";
 import { usePauseStore } from "../pause/pauseStore";
 import { emitLeaveFarm, emitVisitFarm } from "../socket";
 import { useGameStore } from "../store";
-import { Hud } from "../inventory/Hud";
-import { farmToolForItem } from "../inventory/items";
-import { InventoryPanel } from "../inventory/InventoryPanel";
 import "../inventory/inventory.css";
-import { useInventoryKeys } from "../inventory/useInventoryKeys";
 import { useInventoryStore } from "../inventory/inventoryStore";
+import { useInventoryKeys } from "../inventory/useInventoryKeys";
 import { BlackjackOverlay } from "./BlackjackOverlay";
 import { CasinoScene } from "./CasinoScene";
 import { casinoResources } from "./casinoResources";
+import { EconomyHUD } from "./EconomyHUD";
 import { FarmMapScene } from "./FarmMapScene";
 import type { FarmHudSnapshot } from "./farmHud";
 import "./farmMap.css";
-import { MAP_HEIGHT, MAP_WIDTH } from "./mapData";
 import { MarketplaceScene } from "./MarketplaceScene";
+import { MarketWindow } from "./MarketWindow";
+import { MAP_HEIGHT, MAP_WIDTH } from "./mapData";
+import { MARKETS } from "./marketData";
 import { marketplaceResources } from "./marketplaceResources";
 import { resources } from "./resources";
+import { useFarmMarket } from "./useFarmMarket";
 import type { WorldArea } from "./WalkingScene";
 
 const worldResources = [
 	...new Set([...resources, ...marketplaceResources, ...casinoResources]),
 ];
 
+const TOOLS: Array<{ id: FarmToolId; label: string; key: string }> = [
+	{ id: "hoe", label: "Hoe", key: "1" },
+	{ id: "seed", label: "Seeds", key: "2" },
+	{ id: "bucket", label: "Bucket", key: "3" },
+	{ id: "scythe", label: "Scythe", key: "4" },
+];
+
+const TOOL_BY_KEY: Record<string, FarmToolId> = {
+	Digit1: "hoe",
+	Digit2: "seed",
+	Digit3: "bucket",
+	Digit4: "scythe",
+	Numpad1: "hoe",
+	Numpad2: "seed",
+	Numpad3: "bucket",
+	Numpad4: "scythe",
+};
+
 export default function FarmMap() {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	useInventoryKeys();
 	const sceneRef = useRef<FarmMapScene | null>(null);
+	const marketSceneRef = useRef<MarketplaceScene | null>(null);
 	const casinoRef = useRef<CasinoScene | null>(null);
 	const username = useGameStore((s) => s.username);
 	const farm = useGameStore((s) => s.activeFarm);
@@ -55,6 +80,14 @@ export default function FarmMap() {
 
 	const target = owner ?? username;
 	const isOwner = target === username;
+	const {
+		market,
+		marketMessage,
+		setMarket,
+		setMarketMessage,
+		closeMarket,
+		itemControls,
+	} = useFarmMarket(target, isOwner);
 
 	useEffect(() => {
 		// Re-baseline harvest tomatoes whenever the target farm changes.
@@ -112,10 +145,13 @@ export default function FarmMap() {
 		scene.onFarmUpdate = (snapshot) => setHud(snapshot);
 		sceneRef.current = scene;
 		engine.addScene("farm-map", scene);
-		engine.addScene(
-			"marketplace",
-			new MarketplaceScene(setTravelPrompt, setArea),
-		);
+		const marketplace = new MarketplaceScene(setTravelPrompt, setArea, (id) => {
+			marketplace.setPaused(true);
+			setMarketMessage(null);
+			setMarket(id);
+		});
+		marketSceneRef.current = marketplace;
+		engine.addScene("marketplace", marketplace);
 		const casino = new CasinoScene(setTravelPrompt, setArea, () => {
 			casino.setPaused(true);
 			setBlackjackOpen(true);
@@ -133,11 +169,21 @@ export default function FarmMap() {
 		return () => {
 			cancelled = true;
 			sceneRef.current = null;
+			marketSceneRef.current = null;
 			casinoRef.current = null;
 			engine.stop();
 			engine.dispose();
 		};
-	}, [target, isOwner]);
+	}, [target, isOwner, setMarket, setMarketMessage]);
+
+	useEffect(() => {
+		function onKeyDown(event: KeyboardEvent) {
+			const next = TOOL_BY_KEY[event.code];
+			if (next) setTool(next);
+		}
+		window.addEventListener("keydown", onKeyDown);
+		return () => window.removeEventListener("keydown", onKeyDown);
+	}, [setTool]);
 
 	useEffect(() => {
 		sceneRef.current?.setTool(tool);
@@ -164,6 +210,16 @@ export default function FarmMap() {
 		};
 	}, [setPaused, setInventoryOpen]);
 
+	function handleCloseMarket() {
+		closeMarket();
+		marketSceneRef.current?.setPaused(false);
+	}
+
+	async function onSignOut() {
+		await logout();
+		navigate("/", { replace: true });
+	}
+
 	function closeBlackjack() {
 		casinoRef.current?.setPaused(false);
 		setBlackjackOpen(false);
@@ -176,9 +232,83 @@ export default function FarmMap() {
 				className="farm-map-canvas"
 				aria-label={`${area} map. Use WASD or arrow keys to walk.`}
 			/>
+			{market && (
+				<MarketWindow
+					market={MARKETS[market]}
+					controls={itemControls}
+					message={marketMessage}
+					onClose={handleCloseMarket}
+				/>
+			)}
 			{travelPrompt && (
 				<div className="farm-map-travel-prompt" data-testid="travel-prompt">
 					{travelPrompt}
+				</div>
+			)}
+			<div className="farm-map-bar">
+				<span data-testid="farm-map-owner">
+					{isOwner ? "Your farm" : `${target}'s farm`}
+				</span>
+				<span className="farm-map-user" data-testid="farm-map-user">
+					{username}
+				</span>
+				<EconomyHUD />
+				<span data-testid="farm-map-tomatoes">
+					{farm?.tomatoes ?? 0} tomatoes
+				</span>
+				<span data-testid="farm-map-tiles">
+					{farm?.tiles.length ?? 0} tiles
+				</span>
+				<Link to="/dashboard" className="farm-map-signout">
+					Dashboard
+				</Link>
+				<button
+					type="button"
+					data-testid="logout"
+					onClick={onSignOut}
+					className="farm-map-signout"
+				>
+					Sign out
+				</button>
+			</div>
+			{area === "Farm" && (
+				<div className="farm-hud" data-testid="farm-hud">
+					{isOwner ? (
+						<div
+							className="farm-tools"
+							role="toolbar"
+							aria-label="Farming tools"
+						>
+							{TOOLS.map((entry) => (
+								<button
+									key={entry.id}
+									type="button"
+									data-testid={`tool-${entry.id}`}
+									aria-pressed={tool === entry.id}
+									className={
+										tool === entry.id
+											? "farm-tool farm-tool-active"
+											: "farm-tool"
+									}
+									onClick={() => setTool(entry.id)}
+								>
+									<span className="farm-tool-key">{entry.key}</span>{" "}
+									{entry.label}
+								</button>
+							))}
+						</div>
+					) : null}
+					<div className="farm-status">
+						<span data-testid="farm-tomatoes">🍅 {hud.tomatoes}</span>
+						<span data-testid="farm-tile">
+							{hud.hovered
+								? `(${hud.hovered.column}, ${hud.hovered.row}): ${hud.hovered.state}`
+								: "—"}
+						</span>
+					</div>
+					<p className="farm-hint" data-testid="farm-hint">
+						{hud.message}
+					</p>
 				</div>
 			)}
 			<Hud tiles={farm?.tiles.length ?? 0} hovered={hud.hovered} />
