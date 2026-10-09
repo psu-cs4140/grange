@@ -20,6 +20,12 @@ export async function resetServer(): Promise<void> {
 export async function waitForWorld(page: Page): Promise<void> {
 	await page.locator("canvas.farm-map-canvas").waitFor({ state: "visible" });
 	await page.waitForLoadState("networkidle");
+	// The Excalibur engine starts asynchronously after the canvas mounts, so
+	// wait for the world to report that it is actually interactive before any
+	// keyboard-driven test acts on it.
+	await page
+		.locator('.farm-map-page[data-world-ready="true"]')
+		.waitFor({ state: "attached" });
 }
 
 /** Continues from the main menu into the farm and waits for it to be live. */

@@ -1,8 +1,7 @@
 import * as ex from "excalibur";
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import type { FarmToolId } from "../../shared/farm";
-import { logout } from "../auth";
 import { Hud } from "../inventory/Hud";
 import { InventoryPanel } from "../inventory/InventoryPanel";
 import { farmToolForItem } from "../inventory/items";
@@ -17,7 +16,6 @@ import { useInventoryKeys } from "../inventory/useInventoryKeys";
 import { BlackjackOverlay } from "./BlackjackOverlay";
 import { CasinoScene } from "./CasinoScene";
 import { casinoResources } from "./casinoResources";
-import { EconomyHUD } from "./EconomyHUD";
 import { FarmMapScene } from "./FarmMapScene";
 import type { FarmHudSnapshot } from "./farmHud";
 import "./farmMap.css";
@@ -26,9 +24,9 @@ import { MarketWindow } from "./MarketWindow";
 import { MAP_HEIGHT, MAP_WIDTH } from "./mapData";
 import { MARKETS } from "./marketData";
 import { marketplaceResources } from "./marketplaceResources";
+import { RouletteOverlay } from "./RouletteOverlay";
 import { resources } from "./resources";
 import { useFarmMarket } from "./useFarmMarket";
-import { RouletteOverlay } from "./RouletteOverlay";
 import type { WorldArea } from "./WalkingScene";
 
 const worldResources = [
@@ -127,12 +125,14 @@ export default function FarmMap() {
 	const [travelPrompt, setTravelPrompt] = useState<string | null>(null);
 	const [blackjackOpen, setBlackjackOpen] = useState(false);
 	const [rouletteOpen, setRouletteOpen] = useState(false);
+	const [worldReady, setWorldReady] = useState(false);
 
 	useEffect(() => {
 		const canvas = canvasRef.current;
 		if (!canvas || !target) return;
 
 		let cancelled = false;
+		setWorldReady(false);
 		const engine = new ex.Engine({
 			canvasElement: canvas,
 			viewport: { width: MAP_WIDTH, height: MAP_HEIGHT },
@@ -144,7 +144,11 @@ export default function FarmMap() {
 		});
 
 		const scene = new FarmMapScene(target, isOwner, setTravelPrompt, setArea);
-		scene.onFarmUpdate = (snapshot) => setHud(snapshot);
+		scene.onFarmUpdate = (snapshot) => {
+			if (cancelled) return;
+			setHud(snapshot);
+			setWorldReady(true);
+		};
 		sceneRef.current = scene;
 		engine.addScene("farm-map", scene);
 		const marketplace = new MarketplaceScene(setTravelPrompt, setArea, (id) => {
@@ -172,7 +176,8 @@ export default function FarmMap() {
 			async () => {
 				if (cancelled) return;
 				await engine.start();
-				if (!cancelled) await engine.goToScene("farm-map");
+				if (cancelled) return;
+				await engine.goToScene("farm-map");
 			},
 		);
 
@@ -225,11 +230,6 @@ export default function FarmMap() {
 		marketSceneRef.current?.setPaused(false);
 	}
 
-	async function onSignOut() {
-		await logout();
-		navigate("/", { replace: true });
-	}
-
 	function closeCasinoOverlay() {
 		casinoRef.current?.setPaused(false);
 		setBlackjackOpen(false);
@@ -237,7 +237,10 @@ export default function FarmMap() {
 	}
 
 	return (
-		<main className="farm-map-page">
+		<main
+			className="farm-map-page"
+			data-world-ready={worldReady ? "true" : "false"}
+		>
 			<canvas
 				ref={canvasRef}
 				className="farm-map-canvas"
@@ -256,32 +259,6 @@ export default function FarmMap() {
 					{travelPrompt}
 				</div>
 			)}
-			<div className="farm-map-bar">
-				<span data-testid="farm-map-owner">
-					{isOwner ? "Your farm" : `${target}'s farm`}
-				</span>
-				<span className="farm-map-user" data-testid="farm-map-user">
-					{username}
-				</span>
-				<EconomyHUD />
-				<span data-testid="farm-map-tomatoes">
-					{farm?.tomatoes ?? 0} tomatoes
-				</span>
-				<span data-testid="farm-map-tiles">
-					{farm?.tiles.length ?? 0} tiles
-				</span>
-				<Link to="/dashboard" className="farm-map-signout">
-					Dashboard
-				</Link>
-				<button
-					type="button"
-					data-testid="logout"
-					onClick={onSignOut}
-					className="farm-map-signout"
-				>
-					Sign out
-				</button>
-			</div>
 			{area === "Farm" && (
 				<div className="farm-hud" data-testid="farm-hud">
 					{isOwner ? (
@@ -311,11 +288,6 @@ export default function FarmMap() {
 					) : null}
 					<div className="farm-status">
 						<span data-testid="farm-tomatoes">🍅 {hud.tomatoes}</span>
-						<span data-testid="farm-tile">
-							{hud.hovered
-								? `(${hud.hovered.column}, ${hud.hovered.row}): ${hud.hovered.state}`
-								: "—"}
-						</span>
 					</div>
 					<p className="farm-hint" data-testid="farm-hint">
 						{hud.message}
