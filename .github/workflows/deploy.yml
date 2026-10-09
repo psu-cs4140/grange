@@ -60,7 +60,15 @@ jobs:
       - name: Sync release
         run: |
           rsync -az --delete backend/_build/prod/rel/grange/ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"
-          rsync -az deploy/deploy.sh "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/deploy.sh"
+          rsync -az deploy/deploy.sh deploy/grange.service deploy/install-service.sh "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"
 
       - name: Restart
-        run: ssh "$DEPLOY_USER@$DEPLOY_HOST" "APP_PORT=$APP_PORT bash $DEPLOY_PATH/deploy.sh"
+        run: |
+          ssh "$DEPLOY_USER@$DEPLOY_HOST" "bash $DEPLOY_PATH/install-service.sh"
+          ssh "$DEPLOY_USER@$DEPLOY_HOST" "APP_PORT=$APP_PORT bash $DEPLOY_PATH/deploy.sh"
+
+      - name: Show service diagnostics
+        if: ${{ failure() }}
+        run: |
+          ssh "$DEPLOY_USER@$DEPLOY_HOST" \
+            'export XDG_RUNTIME_DIR="/run/user/$(id -u)"; systemctl --user status grange --no-pager || true; journalctl --user -u grange -n 100 --no-pager || true'
