@@ -53,6 +53,27 @@ defmodule Grange.FarmStore do
     end
   end
 
+  @spec sell_tomatoes(String.t(), integer()) :: {:ok, map()} | {:error, String.t()}
+  def sell_tomatoes(owner, count) when is_integer(count) and count > 0 do
+    case Repo.get(FarmRecord, owner) do
+      %FarmRecord{tomatoes: tomatoes} = farm when tomatoes >= count ->
+        farm
+        |> Ecto.Changeset.change(tomatoes: tomatoes - count)
+        |> Repo.update!()
+
+        broadcast_change(owner)
+        {:ok, view(owner)}
+
+      %FarmRecord{} ->
+        {:error, "not enough tomatoes"}
+
+      nil ->
+        {:error, "farm not found"}
+    end
+  end
+
+  def sell_tomatoes(_owner, _count), do: {:error, "invalid count"}
+
   @spec tick(integer()) :: [String.t()]
   def tick(now \\ System.system_time(:millisecond)) do
     ready =
