@@ -149,6 +149,20 @@ describe("walking collisions", () => {
 				casino.y - CASINO_BLACKJACK_TABLE.y,
 			),
 		).toBeLessThan(115);
+		const roulette = walk(
+			CASINO_PLAYER_SPAWN,
+			[
+				{ x: Math.SQRT1_2, y: Math.SQRT1_2, seconds: 1.8 },
+				{ x: 1, y: 0, seconds: 1 },
+			],
+			casinoWalkObstacles,
+		);
+		expect(
+			Math.hypot(
+				roulette.x - CASINO_ROULETTE_TABLE.x,
+				roulette.y - CASINO_ROULETTE_TABLE.y,
+			),
+		).toBeLessThan(145);
 
 		const produce = walk(
 			MARKETPLACE_PLAYER_SPAWN,

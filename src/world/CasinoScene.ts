@@ -44,7 +44,7 @@ export class CasinoScene extends WalkingScene {
 				{
 					position: ex.vec(CASINO_ROULETTE_TABLE.x, CASINO_ROULETTE_TABLE.y),
 					prompt: "Press E or Enter to play roulette",
-					radius: 115,
+					radius: 145,
 					action: onRoulette,
 				},
 			],
