@@ -8,6 +8,7 @@ import { FARM_PLAYER_SPAWN, FARM_TRAIN_STOP } from "./mapData";
 import {
 	MARKETPLACE_CASINO_ENTRANCE,
 	MARKETPLACE_PLAYER_SPAWN,
+	MARKETPLACE_PRODUCE_MARKET_ENTRANCE,
 	MARKETPLACE_TRAIN_STOP,
 } from "./marketplaceData";
 import {
@@ -148,5 +149,20 @@ describe("walking collisions", () => {
 				casino.y - CASINO_BLACKJACK_TABLE.y,
 			),
 		).toBeLessThan(115);
+
+		const produce = walk(
+			MARKETPLACE_PLAYER_SPAWN,
+			[
+				{ x: 0, y: -1, seconds: 2 },
+				{ x: 1, y: 0, seconds: 1 },
+			],
+			marketplaceWalkObstacles,
+		);
+		expect(
+			Math.hypot(
+				produce.x - MARKETPLACE_PRODUCE_MARKET_ENTRANCE.x,
+				produce.y - MARKETPLACE_PRODUCE_MARKET_ENTRANCE.y,
+			),
+		).toBeLessThan(95);
 	});
 });
