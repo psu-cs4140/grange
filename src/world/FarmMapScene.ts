@@ -1,9 +1,9 @@
 import * as ex from "excalibur";
 import type { FarmTileState, FarmToolId } from "../../shared/farm";
 import { isFarmInBounds } from "../../shared/farm";
+import { isInventoryBlockingInput } from "../inventory/inventoryStore";
 import { emitFarmAction } from "../socket";
 import { useGameStore } from "../store";
-import { isInventoryBlockingInput } from "../inventory/inventoryStore";
 import {
 	BlockRegistry,
 	decorByTile,
@@ -13,7 +13,7 @@ import {
 import { CropLayer } from "./cropLayer";
 import { FarmTravel } from "./FarmTravel";
 import type { FarmHoveredTile, FarmHudSnapshot } from "./farmHud";
-import { TOOL_HINTS, TOOL_KEYS, TOOL_KIND } from "./farmTools";
+import { TOOL_HINTS, TOOL_KIND } from "./farmTools";
 import { InputManager } from "./InputManager";
 import {
 	FARM_PLAYER_SPAWN,
