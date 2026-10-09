@@ -28,6 +28,8 @@ import { MARKETS } from "./marketData";
 import { marketplaceResources } from "./marketplaceResources";
 import { resources } from "./resources";
 import { useFarmMarket } from "./useFarmMarket";
+import { RouletteOverlay } from "./RouletteOverlay";
+import { useEconomyBalance } from "./useEconomy";
 import type { WorldArea } from "./WalkingScene";
 
 const worldResources = [
@@ -125,6 +127,7 @@ export default function FarmMap() {
 	const [area, setArea] = useState<WorldArea>("Farm");
 	const [travelPrompt, setTravelPrompt] = useState<string | null>(null);
 	const [blackjackOpen, setBlackjackOpen] = useState(false);
+	const [rouletteOpen, setRouletteOpen] = useState(false);
 
 	useEffect(() => {
 		const canvas = canvasRef.current;
@@ -152,10 +155,18 @@ export default function FarmMap() {
 		});
 		marketSceneRef.current = marketplace;
 		engine.addScene("marketplace", marketplace);
-		const casino = new CasinoScene(setTravelPrompt, setArea, () => {
-			casino.setPaused(true);
-			setBlackjackOpen(true);
-		});
+		const casino = new CasinoScene(
+			setTravelPrompt,
+			setArea,
+			() => {
+				casino.setPaused(true);
+				setBlackjackOpen(true);
+			},
+			() => {
+				casino.setPaused(true);
+				setRouletteOpen(true);
+			},
+		);
 		casinoRef.current = casino;
 		engine.addScene("casino", casino);
 		void Promise.all(worldResources.map((resource) => resource.load())).then(
@@ -220,9 +231,10 @@ export default function FarmMap() {
 		navigate("/", { replace: true });
 	}
 
-	function closeBlackjack() {
+	function closeCasinoOverlay() {
 		casinoRef.current?.setPaused(false);
 		setBlackjackOpen(false);
+		setRouletteOpen(false);
 	}
 
 	return (
@@ -314,7 +326,8 @@ export default function FarmMap() {
 			<Hud tiles={farm?.tiles.length ?? 0} hovered={hud.hovered} />
 			<InventoryPanel />
 			{paused && <PauseMenu />}
-			{blackjackOpen && <BlackjackOverlay onClose={closeBlackjack} />}
+			{blackjackOpen && <BlackjackOverlay onClose={closeCasinoOverlay} />}
+			{rouletteOpen && <RouletteOverlay onClose={closeCasinoOverlay} />}
 		</main>
 	);
 }
