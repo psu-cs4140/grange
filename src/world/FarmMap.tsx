@@ -24,6 +24,7 @@ import { MarketWindow } from "./MarketWindow";
 import { MAP_HEIGHT, MAP_WIDTH } from "./mapData";
 import { MARKETS } from "./marketData";
 import { marketplaceResources } from "./marketplaceResources";
+import { PokerOverlay } from "./PokerOverlay";
 import { RouletteOverlay } from "./RouletteOverlay";
 import { resources } from "./resources";
 import { useFarmMarket } from "./useFarmMarket";
@@ -124,6 +125,7 @@ export default function FarmMap() {
 	const [area, setArea] = useState<WorldArea>("Farm");
 	const [travelPrompt, setTravelPrompt] = useState<string | null>(null);
 	const [blackjackOpen, setBlackjackOpen] = useState(false);
+	const [pokerOpen, setPokerOpen] = useState(false);
 	const [rouletteOpen, setRouletteOpen] = useState(false);
 	const [worldReady, setWorldReady] = useState(false);
 
@@ -164,6 +166,10 @@ export default function FarmMap() {
 			() => {
 				casino.setPaused(true);
 				setBlackjackOpen(true);
+			},
+			() => {
+				casino.setPaused(true);
+				setPokerOpen(true);
 			},
 			() => {
 				casino.setPaused(true);
@@ -233,6 +239,7 @@ export default function FarmMap() {
 	function closeCasinoOverlay() {
 		casinoRef.current?.setPaused(false);
 		setBlackjackOpen(false);
+		setPokerOpen(false);
 		setRouletteOpen(false);
 	}
 
@@ -298,6 +305,7 @@ export default function FarmMap() {
 			<InventoryPanel />
 			{paused && <PauseMenu />}
 			{blackjackOpen && <BlackjackOverlay onClose={closeCasinoOverlay} />}
+			{pokerOpen && <PokerOverlay onClose={closeCasinoOverlay} />}
 			{rouletteOpen && <RouletteOverlay onClose={closeCasinoOverlay} />}
 		</main>
 	);
