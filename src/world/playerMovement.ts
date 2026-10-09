@@ -1,7 +1,17 @@
 import * as ex from "excalibur";
 import type { InputVector } from "./InputManager";
 import { MAP_HEIGHT, MAP_WIDTH } from "./mapData";
+import { farmWalkObstacles } from "./sceneObstacles";
 import { moveAroundObstacles, type WalkObstacle } from "./walkCollisions";
+
+/** Farm movement uses the same speed as the other walking scenes. */
+export function updateFarmPlayer(
+	player: ex.Actor,
+	direction: InputVector,
+	delta: number,
+): void {
+	updateWalkingPlayer(player, direction, 160, delta, farmWalkObstacles);
+}
 
 export function updateWalkingPlayer(
 	player: ex.Actor,

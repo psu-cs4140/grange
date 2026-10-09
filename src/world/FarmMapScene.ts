@@ -27,9 +27,8 @@ import {
 	TILE_SIZE,
 	terrainAt,
 } from "./mapData";
-import { updateWalkingPlayer } from "./playerMovement";
+import { updateFarmPlayer } from "./playerMovement";
 import { propImages, terrainFrames, terrainImage } from "./resources";
-import { farmWalkObstacles } from "./sceneObstacles";
 import { clearDecorAt, refreshTile } from "./tileSync";
 import type { WorldArea } from "./WalkingScene";
 
@@ -38,7 +37,6 @@ export class FarmMapScene extends ex.Scene {
 
 	private inputManager!: InputManager;
 	private player!: ex.Actor;
-	private readonly playerSpeed = 160; // Pixels per second
 
 	private sheet!: ex.SpriteSheet;
 	private terrain!: ex.TileMap;
@@ -194,13 +192,7 @@ export class FarmMapScene extends ex.Scene {
 		// Poll input vector (normalized -1 to 1)
 		const dir = this.inputManager.getMovementVector();
 
-		updateWalkingPlayer(
-			this.player,
-			dir,
-			this.playerSpeed,
-			delta,
-			farmWalkObstacles,
-		);
+		updateFarmPlayer(this.player, dir, delta);
 
 		this.travel.update(this.player, this.inputManager, engine);
 
