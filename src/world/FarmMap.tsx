@@ -29,7 +29,6 @@ import { marketplaceResources } from "./marketplaceResources";
 import { resources } from "./resources";
 import { useFarmMarket } from "./useFarmMarket";
 import { RouletteOverlay } from "./RouletteOverlay";
-import { useEconomyBalance } from "./useEconomy";
 import type { WorldArea } from "./WalkingScene";
 
 const worldResources = [
