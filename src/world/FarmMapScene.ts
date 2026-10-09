@@ -12,23 +12,24 @@ import {
 } from "./blocking";
 import { CropLayer } from "./cropLayer";
 import { FarmTravel } from "./FarmTravel";
+import type { FarmHoveredTile, FarmHudSnapshot } from "./farmHud";
+import { TOOL_HINTS, TOOL_KEYS, TOOL_KIND } from "./farmTools";
 import { InputManager } from "./InputManager";
 import {
 	FARM_PLAYER_SPAWN,
+	isTillableTile,
 	MAP_COLUMNS,
 	MAP_HEIGHT,
 	MAP_ROWS,
 	MAP_WIDTH,
-	TILE_SIZE,
-	isTillableTile,
 	propBlocking,
 	props,
+	TILE_SIZE,
 	terrainAt,
 } from "./mapData";
-import { propImages, terrainFrames, terrainImage } from "./resources";
 import { updateWalkingPlayer } from "./playerMovement";
-import type { FarmHoveredTile, FarmHudSnapshot } from "./farmHud";
-import { TOOL_HINTS, TOOL_KIND } from "./farmTools";
+import { propImages, terrainFrames, terrainImage } from "./resources";
+import { farmWalkObstacles } from "./sceneObstacles";
 import { clearDecorAt, refreshTile } from "./tileSync";
 import type { WorldArea } from "./WalkingScene";
 
@@ -183,7 +184,7 @@ export class FarmMapScene extends ex.Scene {
 		this.travel.activate();
 	}
 
-	override onPreUpdate(engine: ex.Engine, _delta: number): void {
+	override onPreUpdate(engine: ex.Engine, delta: number): void {
 		// Freeze movement while the inventory modal captures input.
 		if (isInventoryBlockingInput()) {
 			this.player.vel = ex.vec(0, 0);
@@ -193,7 +194,13 @@ export class FarmMapScene extends ex.Scene {
 		// Poll input vector (normalized -1 to 1)
 		const dir = this.inputManager.getMovementVector();
 
-		updateWalkingPlayer(this.player, dir, this.playerSpeed);
+		updateWalkingPlayer(
+			this.player,
+			dir,
+			this.playerSpeed,
+			delta,
+			farmWalkObstacles,
+		);
 
 		this.travel.update(this.player, this.inputManager, engine);
 

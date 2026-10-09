@@ -1,14 +1,25 @@
 import * as ex from "excalibur";
 import type { InputVector } from "./InputManager";
 import { MAP_HEIGHT, MAP_WIDTH } from "./mapData";
+import { moveAroundObstacles, type WalkObstacle } from "./walkCollisions";
 
 export function updateWalkingPlayer(
 	player: ex.Actor,
 	direction: InputVector,
 	speed: number,
+	delta: number,
+	obstacles: WalkObstacle[],
 ): void {
-	player.vel = ex.vec(direction.x * speed, direction.y * speed);
+	const step = (speed * Math.min(delta, 100)) / 1000;
+	const next = moveAroundObstacles(
+		player.pos.x,
+		player.pos.y,
+		direction.x * step,
+		direction.y * step,
+		obstacles,
+	);
+	player.vel = ex.Vector.Zero;
+	player.pos.x = ex.clamp(next.x, 16, MAP_WIDTH - 16);
+	player.pos.y = ex.clamp(next.y, 32, MAP_HEIGHT - 16);
 	player.z = 100 + Math.floor(player.pos.y);
-	player.pos.x = ex.clamp(player.pos.x, 16, MAP_WIDTH - 16);
-	player.pos.y = ex.clamp(player.pos.y, 32, MAP_HEIGHT);
 }
