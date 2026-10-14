@@ -12,6 +12,7 @@ import {
 } from "./blocking";
 import { CropLayer } from "./cropLayer";
 import { FarmTravel } from "./FarmTravel";
+import { addFarmerGraphics, updateFarmerGraphics } from "./farmerSprite";
 import type { FarmHoveredTile, FarmHudSnapshot } from "./farmHud";
 import { TOOL_HINTS, TOOL_KIND } from "./farmTools";
 import { InputManager } from "./InputManager";
@@ -140,10 +141,10 @@ export class FarmMapScene extends ex.Scene {
 			pos: ex.vec(FARM_PLAYER_SPAWN.x, FARM_PLAYER_SPAWN.y),
 			width: 32,
 			height: 32,
-			color: ex.Color.fromHex("#ffcc00"), // Yellow box placeholder or attach player sprite
 			anchor: ex.vec(0.5, 1),
 			z: 200,
 		});
+		addFarmerGraphics(this.player);
 		this.add(this.player);
 
 		// 5. Tool input: click or drag to act on field tiles via the server
@@ -186,6 +187,7 @@ export class FarmMapScene extends ex.Scene {
 		// Freeze movement while the inventory modal captures input.
 		if (isInventoryBlockingInput()) {
 			this.player.vel = ex.vec(0, 0);
+			updateFarmerGraphics(this.player, { x: 0, y: 0 });
 			return;
 		}
 
@@ -193,6 +195,7 @@ export class FarmMapScene extends ex.Scene {
 		const dir = this.inputManager.getMovementVector();
 
 		updateFarmPlayer(this.player, dir, delta);
+		updateFarmerGraphics(this.player, dir);
 
 		this.travel.update(this.player, this.inputManager, engine);
 
