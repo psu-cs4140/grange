@@ -36,6 +36,13 @@ async function tilePixel(page: Page, col: number, row: number) {
 	);
 }
 
+async function clickWorld(page: Page, worldX: number, worldY: number) {
+	const box = await page.locator(".farm-map-canvas").boundingBox();
+	expect(box).not.toBeNull();
+	await page.mouse.click(box!.x + worldX / 1152 * box!.width,
+		box!.y + worldY / 768 * box!.height);
+}
+
 test("farming loop: hoe, seed, bucket, grow, scythe", async ({ page }) => {
 	await resetServer();
 	await register(page, uniqueName("Sprout"));
@@ -91,17 +98,47 @@ test("farming loop: hoe, seed, bucket, grow, scythe", async ({ page }) => {
 	await expect(page.getByTestId("farm-tile")).toContainText("(8, 6): tilled");
 });
 
-test("the hoe refuses fence tiles", async ({ page }) => {
+test("a fence places, blocks hoeing, and returns to inventory when shoveled", async ({ page }) => {
 	await resetServer();
 	await register(page, uniqueName("Sprout"));
 	await expect(page).toHaveURL(/\/world$/);
 	await expect(page.getByTestId("notification-feed")).toBeVisible();
 
+	await page.keyboard.press("6");
+	await clickTile(page, 7, 5);
+	await expect(page.getByTestId("slot-hotbar-5")).toHaveAttribute("data-count", "19");
+	await page.keyboard.press("1");
 	await clickTile(page, 7, 5);
 	await expect(page.getByTestId("notification-feed")).toContainText(
 		"Something is in the way.",
 	);
 	await expect(page.getByTestId("farm-tile")).toContainText("(7, 5): grass");
+	await page.keyboard.press("7");
+	await clickTile(page, 7, 5);
+	await expect(page.getByTestId("slot-hotbar-5")).toHaveAttribute("data-count", "20");
+	await page.keyboard.press("1");
+	await clickTile(page, 7, 5);
+	await expect(page.getByTestId("farm-tile")).toContainText("(7, 5): tilled");
+});
+
+test("the shovel moves a well and sign through inventory", async ({ page }) => {
+	await resetServer();
+	await register(page, uniqueName("Mover"));
+	await page.keyboard.press("7");
+	await clickWorld(page, 200, 350);
+	const wellSlot = page.locator('[data-item="well"]');
+	await expect(wellSlot).toHaveCount(1);
+	await wellSlot.click();
+	await clickTile(page, 8, 7);
+	await expect(wellSlot).toHaveCount(0);
+
+	await page.keyboard.press("7");
+	await clickWorld(page, 395, 360);
+	const signSlot = page.locator('[data-item="sign"]');
+	await expect(signSlot).toHaveCount(1);
+	await signSlot.click();
+	await clickTile(page, 6, 7);
+	await expect(signSlot).toHaveCount(0);
 });
 
 test("the hoe refuses tiles behind buildings", async ({ page }) => {
@@ -116,11 +153,15 @@ test("the hoe refuses tiles behind buildings", async ({ page }) => {
 	await expect(page.getByTestId("farm-tile")).toContainText("(3, 2): grass");
 });
 
-test("tilling under flowers clears them", async ({ page }) => {
+test("flowers can be shoveled before tilling their tile", async ({ page }) => {
 	await resetServer();
 	await register(page, uniqueName("Sprout"));
 	await expect(page).toHaveURL(/\/world$/);
 
+	await page.keyboard.press("7");
+	await clickTile(page, 11, 3);
+	await expect(page.getByTestId("notification-feed")).toContainText("inventory");
+	await page.keyboard.press("1");
 	await clickTile(page, 11, 3);
 	await expect(page.getByTestId("farm-tile")).toContainText("(11, 3): tilled");
 });
