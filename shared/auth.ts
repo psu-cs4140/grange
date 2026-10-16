@@ -5,6 +5,7 @@ export interface User {
 	passwordHash: string;
 	createdAt: string;
 	balance: number;
+	emailVerifiedAt: string | null;
 }
 
 export type AuthUser = Omit<User, "passwordHash">;
