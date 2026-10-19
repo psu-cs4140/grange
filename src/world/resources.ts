@@ -1,5 +1,7 @@
 import * as ex from "excalibur";
+import { fenceResources } from "./fenceResources";
 import type { PropKey, TerrainKey } from "./mapData";
+import { farmerImage } from "./farmerSprite";
 
 export const image = (path: string) =>
 	new ex.ImageSource(`/assets/${path}`, {
@@ -8,6 +10,19 @@ export const image = (path: string) =>
 
 export const terrainImage = image("farm/terrain.webp");
 export const trainImage = image("transport/starter-train.webp");
+export const trainTracksImage = image("transport/train-tracks.webp");
+/** The two extra wheel poses the train cycles through while it is moving. The
+ * parked art (`trainImage`) is the third pose, so the loop reads end to end. */
+export const trainFrameImages = [
+	image("transport/train-animation-1.webp"),
+	image("transport/train-animation-2.webp"),
+];
+/** Smoke puffs cycled small -> med -> big in lockstep with the three wheel
+ * poses while the train is moving. */
+export const smokeSmallImage = image("transport/smokeSmall.png");
+export const smokeMedImage = image("transport/smokeMed.png");
+export const smokeBigImage = image("transport/smokeBig.png");
+export const smokeImages = [smokeSmallImage, smokeMedImage, smokeBigImage];
 
 export const sproutImage = image("farm/plants/sprout.webp");
 export const tomatoPlantImage = image("farm/plants/tomato-plant.webp");
@@ -28,8 +43,6 @@ export const propImages: Record<PropKey, ex.ImageSource> = {
 	sign: image("farm/objects/sign.webp"),
 	barrel: image("farm/objects/barrel.webp"),
 	crate: image("farm/objects/crate.webp"),
-	"fence-horizontal": image("farm/objects/fence-horizontal.webp"),
-	"fence-post": image("farm/objects/fence-post.webp"),
 	daisies: image("farm/plants/daisies.webp"),
 	marigolds: image("farm/plants/marigolds.webp"),
 	"blue-flowers": image("farm/plants/blue-flowers.webp"),
@@ -38,6 +51,11 @@ export const propImages: Record<PropKey, ex.ImageSource> = {
 
 export const resources = [
 	terrainImage,
+	...fenceResources,
+	farmerImage,
+	trainTracksImage,
+	...trainFrameImages,
+	...smokeImages,
 	...Object.values(propImages),
 	...Object.values(cropImages),
 ];

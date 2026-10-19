@@ -27,12 +27,35 @@ export type PropKey =
 	| "sign"
 	| "barrel"
 	| "crate"
-	| "fence-horizontal"
-	| "fence-post"
 	| "daisies"
 	| "marigolds"
 	| "blue-flowers"
 	| "starter-train";
+
+export type MovablePropKey = Exclude<PropKey, "starter-train">;
+export const MOVABLE_PROP_ASSETS: readonly MovablePropKey[] = [
+	"farmhouse",
+	"barn",
+	"well",
+	"bench",
+	"sign",
+	"barrel",
+	"crate",
+	"oak-tree",
+	"pine-tree",
+	"apple-tree",
+	"daisies",
+	"marigolds",
+	"blue-flowers",
+];
+export const isMovablePropAsset = (asset: string): asset is MovablePropKey =>
+	MOVABLE_PROP_ASSETS.includes(asset as MovablePropKey);
+
+/** Props the owning scene animates itself (currently only the train), so the
+ * static prop renderers must skip drawing a still copy of them. */
+export const ANIMATED_PROPS: ReadonlySet<string> = new Set<string>([
+	"starter-train",
+]);
 
 export interface MapProp {
 	asset: PropKey;
@@ -84,6 +107,19 @@ export function worldToFieldTile(
 
 export const FARM_PLAYER_SPAWN = { x: 576, y: 620 } as const;
 export const FARM_TRAIN_STOP = { x: 810, y: 600 } as const;
+export const FARM_TRAIN_ENGINE_STOP = { x: 1070, y: 600 } as const;
+/** Where the player steps off when arriving at the farm by train: just above
+ * the parked train so they rise out from behind it. */
+export const FARM_TRAIN_ARRIVAL_SPAWN = { x: 960, y: 530 } as const;
+
+/** The cart and engine share one continuous boarding area. */
+export function isNearFarmTrain(x: number, y: number): boolean {
+	const nearestX = Math.max(
+		FARM_TRAIN_STOP.x,
+		Math.min(x, FARM_TRAIN_ENGINE_STOP.x),
+	);
+	return Math.hypot(x - nearestX, y - FARM_TRAIN_STOP.y) <= 115;
+}
 
 /** Edit these rules to redraw the 64px terrain grid. */
 export function terrainAt(column: number, row: number): TerrainKey {
@@ -127,11 +163,9 @@ export const propBlocking: Record<PropKey, PropBlockingRule> = {
 	sign: "rect",
 	barrel: "rect",
 	crate: "rect",
-	"fence-horizontal": "rect",
-	"fence-post": "rect",
-	daisies: "none",
-	marigolds: "none",
-	"blue-flowers": "none",
+	daisies: "base",
+	marigolds: "base",
+	"blue-flowers": "base",
 	"starter-train": "rect",
 };
 
@@ -156,17 +190,3 @@ export const props: MapProp[] = [
 	{ asset: "blue-flowers", x: 1015, y: 410, width: 50 },
 	{ asset: "daisies", x: 150, y: 475, width: 50 },
 ];
-
-for (const x of [465, 555, 645, 735]) {
-	props.push({ asset: "fence-horizontal", x, y: 380, width: 86 });
-}
-
-// Leave a lower opening for future field interactions instead of using a decorative gate.
-for (const x of [465, 555, 735]) {
-	props.push({ asset: "fence-horizontal", x, y: 590, width: 86 });
-}
-
-for (const y of [440, 505, 570]) {
-	props.push({ asset: "fence-post", x: 420, y, width: 42 });
-	props.push({ asset: "fence-post", x: 780, y, width: 42 });
-}

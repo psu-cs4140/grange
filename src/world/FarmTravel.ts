@@ -1,6 +1,7 @@
-import * as ex from "excalibur";
+import type * as ex from "excalibur";
 import type { InputManager } from "./InputManager";
-import { FARM_TRAIN_STOP } from "./mapData";
+import { isNearFarmTrain } from "./mapData";
+import type { TrainController } from "./train";
 import type { WorldArea } from "./WalkingScene";
 
 export class FarmTravel {
@@ -18,18 +19,28 @@ export class FarmTravel {
 		this.setPrompt(null);
 	}
 
-	update(player: ex.Actor, input: InputManager, engine: ex.Engine): void {
-		const nearTrain =
-			player.pos.distance(ex.vec(FARM_TRAIN_STOP.x, FARM_TRAIN_STOP.y)) <= 115;
+	update(
+		player: ex.Actor,
+		input: InputManager,
+		engine: ex.Engine,
+		train: TrainController,
+	): void {
+		const nearTrain = isNearFarmTrain(player.pos.x, player.pos.y);
+		const canBoard = nearTrain && train.canBoard();
 		this.setPrompt(
-			nearTrain ? "Press E or Enter to travel to the marketplace" : null,
+			canBoard ? "Press E or Enter to travel to the marketplace" : null,
 		);
-		if (!nearTrain || this.traveling || !input.consumePress("KeyE", "Enter")) {
-			return;
-		}
+		if (!canBoard || this.traveling) return;
+		if (!input.consumePress("KeyE", "Enter")) return;
 		this.traveling = true;
 		this.setPrompt(null);
-		void engine.goToScene("marketplace");
+		// Ride the train out, then hand off to the marketplace, which slides the
+		// train back in from off-screen.
+		train.depart(() => {
+			void engine.goToScene("marketplace", {
+				sceneActivationData: { trainArriving: true },
+			});
+		});
 	}
 
 	deactivate(): void {
