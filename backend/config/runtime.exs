@@ -26,4 +26,9 @@ if config_env() == :prod do
     pool_size: String.to_integer(System.get_env("POOL_SIZE") || "1"),
     journal_mode: :wal,
     busy_timeout: 5_000
+
+  # Real mail in production; the console adapter (and its token-logging dev
+  # mailbox route) never ships here.
+  config :grange, :mailer, Grange.Mailer.Mailjet
+  config :grange, :app_url, System.get_env("APP_URL") || "http://localhost:#{port}"
 end
