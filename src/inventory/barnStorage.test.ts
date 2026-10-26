@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { BARN_SLOTS, barnEntries } from "./barnStorage";
 import { freeSpaceFor, useInventoryStore } from "./inventoryStore";
+import { ITEMS } from "./items";
 
 beforeEach(() => {
 	useInventoryStore.getState().resetInventory();
@@ -23,9 +24,15 @@ describe("barn storage model", () => {
 
 	it("reports free space across empty and partial stacks", () => {
 		const state = useInventoryStore.getState();
-		// The opening hotbar holds 10 seeds of a 99 stack, leaving 89; the
-		// other 28 empty slots (4 hotbar + 24 grid) each hold a full stack.
-		expect(freeSpaceFor(state, "seed-bag")).toBe(89 + 28 * 99);
+		const slots = [...state.hotbar, ...state.grid];
+		const seedStack = ITEMS["seed-bag"].maxStack;
+		const heldSeeds = slots
+			.filter((slot) => slot.itemId === "seed-bag")
+			.reduce((sum, slot) => sum + slot.count, 0);
+		const emptySlots = slots.filter((slot) => !slot.itemId).length;
+		expect(freeSpaceFor(state, "seed-bag")).toBe(
+			seedStack - heldSeeds + emptySlots * seedStack,
+		);
 	});
 
 	it("tracks the barn window and clears it on reset", () => {

@@ -8,7 +8,7 @@ defmodule GrangeWeb.FarmChannel do
 
   use Phoenix.Channel
 
-  alias Grange.FarmStore
+  alias Grange.{FarmGateActions, FarmStore}
 
   @impl true
   def join("farm:" <> owner, _payload, socket) do
@@ -35,13 +35,21 @@ defmodule GrangeWeb.FarmChannel do
   end
 
   @impl true
-  def handle_in("farmPropAction", %{"action" => action}, socket) do
-    authorize(socket, fn owner -> prop_act(socket, owner, action) end)
+  def handle_in("gateAction", %{"action" => action}, socket) do
+    case socket.assigns[:user] do
+      nil -> {:reply, {:error, %{error: "not logged in"}}, socket}
+      _user -> gate_act(socket, socket.assigns[:owner], action)
+    end
   end
 
   @impl true
-  def handle_in("sellTomatoes", %{"count" => count}, socket) do
-    authorize(socket, fn owner -> sell(socket, owner, count) end)
+  def handle_in("sellProduce", %{"item" => item, "count" => count}, socket) do
+    authorize(socket, fn owner -> sell(socket, owner, item, count) end)
+  end
+
+  @impl true
+  def handle_in("farmPropAction", %{"action" => action}, socket) do
+    authorize(socket, fn owner -> prop_act(socket, owner, action) end)
   end
 
   @impl true
@@ -73,6 +81,13 @@ defmodule GrangeWeb.FarmChannel do
     end
   end
 
+  defp gate_act(socket, owner, action) do
+    case FarmGateActions.toggle(owner, action) do
+      {:ok, _farm} -> {:reply, :ok, socket}
+      {:error, reason} -> {:reply, {:error, %{error: reason}}, socket}
+    end
+  end
+
   defp prop_act(socket, owner, action) do
     case FarmStore.prop_action(owner, action) do
       {:ok, _farm} -> {:reply, :ok, socket}
@@ -80,8 +95,8 @@ defmodule GrangeWeb.FarmChannel do
     end
   end
 
-  defp sell(socket, owner, count) do
-    case FarmStore.sell_tomatoes(owner, count) do
+  defp sell(socket, owner, item, count) do
+    case FarmStore.sell(owner, item, count) do
       {:ok, _farm} -> {:reply, :ok, socket}
       {:error, reason} -> {:reply, {:error, %{error: reason}}, socket}
     end

@@ -1,5 +1,13 @@
 import { type Channel, Socket } from "phoenix";
-import type { ActiveFarm, BarnAction, FarmAction, FarmPropAction, FarmSummary, Player } from "../shared/types";
+import type {
+	ActiveFarm,
+	BarnAction,
+	FarmAction,
+	FarmGateAction,
+	FarmPropAction,
+	FarmSummary,
+	Player,
+} from "../shared/types";
 import { useGameStore } from "./store";
 
 /** Session token used to authenticate the socket handshake. */
@@ -148,23 +156,49 @@ export function emitFarmAction(
 		.receive("timeout", () => cb?.({ ok: false, error: "Timed out" }));
 }
 
-export function emitFarmPropAction(owner: string, action: FarmPropAction,
-	cb?: (res: Ack) => void): void {
+/** Open/close a gate. Unlike farm actions, visitors may call this. */
+export function emitGateAction(
+	owner: string,
+	action: FarmGateAction,
+	cb?: (res: Ack) => void,
+): void {
 	const channel = farmChannel;
 	if (!channel || farmOwner !== owner) {
 		cb?.({ ok: false, error: "not visiting farm" });
 		return;
 	}
-	channel.push("farmPropAction", { action })
+	channel
+		.push("gateAction", { action })
 		.receive("ok", () => cb?.({ ok: true }))
 		.receive("error", (payload: unknown) =>
-			cb?.({ ok: false, error: reasonOf(payload) ?? "Invalid object action" }))
+			cb?.({ ok: false, error: reasonOf(payload) ?? "Could not move gate" }),
+		)
 		.receive("timeout", () => cb?.({ ok: false, error: "Timed out" }));
 }
 
-/** Sells tomatoes from the visited farm's barn back to the market. */
-export function emitSellTomatoes(
+export function emitFarmPropAction(
 	owner: string,
+	action: FarmPropAction,
+	cb?: (res: Ack) => void,
+): void {
+	const channel = farmChannel;
+	if (!channel || farmOwner !== owner) {
+		cb?.({ ok: false, error: "not visiting farm" });
+		return;
+	}
+	channel
+		.push("farmPropAction", { action })
+		.receive("ok", () => cb?.({ ok: true }))
+		.receive("error", (payload: unknown) =>
+			cb?.({ ok: false, error: reasonOf(payload) ?? "Invalid object action" }),
+		)
+		.receive("timeout", () => cb?.({ ok: false, error: "Timed out" }));
+}
+
+/** Sells a produce item from the visited farm's barn back to the market. */
+export function emitSellProduce(
+	owner: string,
+	item: string,
 	count: number,
 	cb?: (res: Ack) => void,
 ): void {
@@ -175,7 +209,7 @@ export function emitSellTomatoes(
 	}
 
 	channel
-		.push("sellTomatoes", { count })
+		.push("sellProduce", { item, count })
 		.receive("ok", () => cb?.({ ok: true }))
 		.receive("error", (payload: unknown) =>
 			cb?.({ ok: false, error: reasonOf(payload) ?? "Could not sell" }),

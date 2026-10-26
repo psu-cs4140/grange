@@ -1,7 +1,6 @@
 import * as ex from "excalibur";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import type { FarmToolId } from "../../shared/farm";
 import { Hud } from "../inventory/Hud";
 import { InventoryPanel } from "../inventory/InventoryPanel";
 import { farmToolForItem } from "../inventory/items";
@@ -14,9 +13,10 @@ import "../inventory/inventory.css";
 import { useInventoryStore } from "../inventory/inventoryStore";
 import { useInventoryKeys } from "../inventory/useInventoryKeys";
 import { MOVABLE_PROP_ASSETS } from "./mapData";
-import { BlackjackOverlay } from "./BlackjackOverlay";
+import { type CasinoOverlay, CasinoOverlays } from "./CasinoOverlays";
 import { CasinoScene } from "./CasinoScene";
 import { casinoResources } from "./casinoResources";
+import { ComboCounter } from "./ComboCounter";
 import { FarmMapScene } from "./FarmMapScene";
 import type { FarmHudSnapshot } from "./farmHud";
 import "./farmMap.css";
@@ -25,33 +25,14 @@ import { MarketWindow } from "./MarketWindow";
 import { MAP_HEIGHT, MAP_WIDTH } from "./mapData";
 import { MARKETS } from "./marketData";
 import { marketplaceResources } from "./marketplaceResources";
-import { PokerOverlay } from "./PokerOverlay";
-import { RouletteOverlay } from "./RouletteOverlay";
 import { resources } from "./resources";
+import { useBarnReconcile } from "./useBarnReconcile";
 import { useFarmMarket } from "./useFarmMarket";
 import type { WorldArea } from "./WalkingScene";
 
 const worldResources = [
 	...new Set([...resources, ...marketplaceResources, ...casinoResources]),
 ];
-
-const TOOLS: Array<{ id: FarmToolId; label: string; key: string }> = [
-	{ id: "hoe", label: "Hoe", key: "1" },
-	{ id: "seed", label: "Seeds", key: "2" },
-	{ id: "bucket", label: "Bucket", key: "3" },
-	{ id: "scythe", label: "Scythe", key: "4" },
-];
-
-const TOOL_BY_KEY: Record<string, FarmToolId> = {
-	Digit1: "hoe",
-	Digit2: "seed",
-	Digit3: "bucket",
-	Digit4: "scythe",
-	Numpad1: "hoe",
-	Numpad2: "seed",
-	Numpad3: "bucket",
-	Numpad4: "scythe",
-};
 
 export default function FarmMap() {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -61,17 +42,15 @@ export default function FarmMap() {
 	const casinoRef = useRef<CasinoScene | null>(null);
 	const username = useGameStore((s) => s.username);
 	const farm = useGameStore((s) => s.activeFarm);
-	const tool = useGameStore((s) => s.tool);
-	const setTool = useGameStore((s) => s.setTool);
 	const selectedHotbar = useInventoryStore((s) => s.selectedHotbar);
 	const hotbar = useInventoryStore((s) => s.hotbar);
-	const addItem = useInventoryStore((s) => s.addItem);
+	const heldItem = hotbar[selectedHotbar]?.itemId ?? null;
+	const heldTool = farmToolForItem(heldItem);
 	const setItemCount = useInventoryStore((s) => s.setItemCount);
 	const setInventoryOpen = useInventoryStore((s) => s.setInventoryOpen);
 	const pushNotice = useNotificationStore((s) => s.push);
 	const paused = usePauseStore((s) => s.paused);
 	const setPaused = usePauseStore((s) => s.setPaused);
-	const tomatoBaseline = useRef<number | null>(null);
 	const { owner } = useParams<{ owner?: string }>();
 	const navigate = useNavigate();
 	const [hud, setHud] = useState<FarmHudSnapshot>({
@@ -92,8 +71,6 @@ export default function FarmMap() {
 	} = useFarmMarket(target, isOwner);
 
 	useEffect(() => {
-		// Re-baseline harvest tomatoes whenever the target farm changes.
-		tomatoBaseline.current = null;
 		if (!target) return;
 
 		emitVisitFarm(target, (res) => {
@@ -103,16 +80,22 @@ export default function FarmMap() {
 		return () => emitLeaveFarm();
 	}, [target, navigate]);
 
-	// Selecting a hotbar slot drives the active farm tool (the hotbar is the
-	// single tool selector). Slots with no tool item leave the tool unchanged.
+	// Selecting a hotbar slot drives the farm hint (the hotbar is the single
+	// tool selector). The action itself reads the held item directly.
 	useEffect(() => {
-		const next = farmToolForItem(hotbar[selectedHotbar]?.itemId ?? null);
-		if (next) setTool(next);
-	}, [hotbar, selectedHotbar, setTool]);
+		sceneRef.current?.setHeldTool(heldTool);
+	}, [heldTool]);
 
-	const heldItem = hotbar[selectedHotbar]?.itemId;
+	// Tell the scene an active slot changed so the combo tracker can grant its
+	// one-time chaining grace on the next different action.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: fires on slot change by design
+	useEffect(() => {
+		sceneRef.current?.noteHotbarSwap();
+	}, [selectedHotbar]);
+
 	useEffect(() => {
 		if (heldItem === "fence") pushNotice("Fence: click clear grass to place a post.", "system");
+		if (heldItem === "gate") pushNotice("Gate: click clear grass to place. Press E nearby to open or close.", "system");
 		if (heldItem === "shovel") pushNotice("Shovel: click a fence or farm object to dig it up.", "system");
 		if (heldItem && MOVABLE_PROP_ASSETS.some((asset) => asset === heldItem))
 			pushNotice(`Click clear ground to place ${heldItem}.`, "system");
@@ -123,6 +106,11 @@ export default function FarmMap() {
 		if (fenceCount !== undefined && isOwner) setItemCount("fence", fenceCount);
 	}, [fenceCount, isOwner, setItemCount]);
 
+	const gateCount = farm?.gate_count;
+	useEffect(() => {
+		if (gateCount !== undefined && isOwner) setItemCount("gate", gateCount);
+	}, [gateCount, isOwner, setItemCount]);
+
 	const propInventory = farm?.prop_inventory;
 	useEffect(() => {
 		if (!propInventory || !isOwner) return;
@@ -130,25 +118,12 @@ export default function FarmMap() {
 			setItemCount(asset, propInventory[asset] ?? 0);
 	}, [propInventory, isOwner, setItemCount]);
 
-	// Harvested tomatoes become physical inventory items. The server keeps its
-	// own barn/lobby total; we mirror the positive delta for the owner into the
-	// inventory. The first snapshot of a farm only sets the baseline, so a
-	// reload doesn't re-bank the persisted server count.
-	const tomatoes = farm?.tomatoes ?? null;
-	useEffect(() => {
-		if (tomatoes === null || !isOwner) return;
-		const previous = tomatoBaseline.current;
-		tomatoBaseline.current = tomatoes;
-		if (previous === null) return;
-		const gained = tomatoes - previous;
-		if (gained > 0) addItem("tomato", gained);
-	}, [tomatoes, isOwner, addItem]);
+	// Keep the local inventory's produce in sync with the authoritative barn.
+	useBarnReconcile(farm?.barn ?? null, isOwner);
 
 	const [area, setArea] = useState<WorldArea>("Farm");
 	const [travelPrompt, setTravelPrompt] = useState<string | null>(null);
-	const [blackjackOpen, setBlackjackOpen] = useState(false);
-	const [pokerOpen, setPokerOpen] = useState(false);
-	const [rouletteOpen, setRouletteOpen] = useState(false);
+	const [casinoOverlay, setCasinoOverlay] = useState<CasinoOverlay | null>(null);
 	const [engineReady, setEngineReady] = useState(false);
 
 	useEffect(() => {
@@ -182,21 +157,17 @@ export default function FarmMap() {
 		});
 		marketSceneRef.current = marketplace;
 		engine.addScene("marketplace", marketplace);
+		function openCasino(overlay: CasinoOverlay) {
+			casino.setPaused(true);
+			setCasinoOverlay(overlay);
+		}
 		const casino = new CasinoScene(
 			setTravelPrompt,
 			setArea,
-			() => {
-				casino.setPaused(true);
-				setBlackjackOpen(true);
-			},
-			() => {
-				casino.setPaused(true);
-				setPokerOpen(true);
-			},
-			() => {
-				casino.setPaused(true);
-				setRouletteOpen(true);
-			},
+			() => openCasino("blackjack"),
+			() => openCasino("poker"),
+			() => openCasino("roulette"),
+			() => openCasino("slots"),
 		);
 		casinoRef.current = casino;
 		engine.addScene("casino", casino);
@@ -218,19 +189,6 @@ export default function FarmMap() {
 			engine.dispose();
 		};
 	}, [target, isOwner, setMarket, setMarketMessage]);
-
-	useEffect(() => {
-		function onKeyDown(event: KeyboardEvent) {
-			const next = TOOL_BY_KEY[event.code];
-			if (next) setTool(next);
-		}
-		window.addEventListener("keydown", onKeyDown);
-		return () => window.removeEventListener("keydown", onKeyDown);
-	}, [setTool]);
-
-	useEffect(() => {
-		sceneRef.current?.setTool(tool);
-	}, [tool]);
 
 	// Route farm hints and errors into the bottom-left feed.
 	useEffect(() => {
@@ -260,9 +218,7 @@ export default function FarmMap() {
 
 	function closeCasinoOverlay() {
 		casinoRef.current?.setPaused(false);
-		setBlackjackOpen(false);
-		setPokerOpen(false);
-		setRouletteOpen(false);
+		setCasinoOverlay(null);
 	}
 
 	// The farm channel join is what sets `farm`; until it lands, an action would
@@ -294,31 +250,6 @@ export default function FarmMap() {
 			)}
 			{area === "Farm" && (
 				<div className="farm-hud" data-testid="farm-hud">
-					{isOwner ? (
-						<div
-							className="farm-tools"
-							role="toolbar"
-							aria-label="Farming tools"
-						>
-							{TOOLS.map((entry) => (
-								<button
-									key={entry.id}
-									type="button"
-									data-testid={`tool-${entry.id}`}
-									aria-pressed={tool === entry.id}
-									className={
-										tool === entry.id
-											? "farm-tool farm-tool-active"
-											: "farm-tool"
-									}
-									onClick={() => setTool(entry.id)}
-								>
-									<span className="farm-tool-key">{entry.key}</span>{" "}
-									{entry.label}
-								</button>
-							))}
-						</div>
-					) : null}
 					<div className="farm-status">
 						<span data-testid="farm-tomatoes">🍅 {hud.tomatoes}</span>
 					</div>
@@ -328,11 +259,10 @@ export default function FarmMap() {
 				</div>
 			)}
 			<Hud tiles={farm?.tiles.length ?? 0} hovered={hud.hovered} />
+			<ComboCounter />
 			<InventoryPanel />
 			{paused && <PauseMenu />}
-			{blackjackOpen && <BlackjackOverlay onClose={closeCasinoOverlay} />}
-			{pokerOpen && <PokerOverlay onClose={closeCasinoOverlay} />}
-			{rouletteOpen && <RouletteOverlay onClose={closeCasinoOverlay} />}
+			<CasinoOverlays open={casinoOverlay} onClose={closeCasinoOverlay} />
 		</main>
 	);
 }

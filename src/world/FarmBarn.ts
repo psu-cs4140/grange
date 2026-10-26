@@ -1,10 +1,8 @@
 import type * as ex from "excalibur";
 import { useInventoryStore } from "../inventory/inventoryStore";
 import type { ItemId } from "../inventory/items";
-import { useGameStore } from "../store";
 import { opensBarn } from "./barnActions";
 import type { FarmPropLayer } from "./farmPropLayer";
-import { TOOL_HINTS } from "./farmTools";
 import type { InputManager } from "./InputManager";
 
 const PROMPT = "Press E to open the barn";
@@ -19,7 +17,7 @@ export class FarmBarn {
 
 	constructor(
 		private readonly isOwner: boolean,
-		private readonly onMessage: (message: string) => void,
+		private readonly onMessage: (message: string | null) => void,
 	) {}
 
 	deactivate(): void {
@@ -69,6 +67,6 @@ export class FarmBarn {
 	private setPrompt(prompt: string | null): void {
 		if (this.activePrompt === prompt) return;
 		this.activePrompt = prompt;
-		this.onMessage(prompt ?? TOOL_HINTS[useGameStore.getState().tool]);
+		this.onMessage(prompt);
 	}
 }
