@@ -13,38 +13,21 @@ const PROMPT = "Press E to open the barn";
  * players. Mirrors FarmTravel so FarmMapScene only wires it up.
  */
 export class FarmBarn {
-	private activePrompt: string | null = null;
+	constructor(private readonly isOwner: boolean) {}
 
-	constructor(
-		private readonly isOwner: boolean,
-		private readonly onMessage: (message: string | null) => void,
-	) {}
-
-	deactivate(): void {
-		this.setPrompt(null);
+	/** The interact prompt to show while the owner stands at the barn. */
+	prompt(player: ex.Actor, props: FarmPropLayer): string | null {
+		const near = this.isOwner && props.barnNear(player.pos.x, player.pos.y);
+		return near ? PROMPT : null;
 	}
 
-	/** Re-shows the prompt after another system replaced the HUD message. */
-	refresh(): void {
-		this.activePrompt = null;
-	}
-
-	/** E-key interact; run each frame while the farm is live. */
+	/** Opens on E at the barn; run after gate input so a gate wins. */
 	update(player: ex.Actor, input: InputManager, props: FarmPropLayer): void {
-		const near =
-			this.isOwner && props.barnNear(player.pos.x, player.pos.y) !== null;
-		this.setPrompt(near ? PROMPT : null);
+		const near = this.isOwner && props.barnNear(player.pos.x, player.pos.y);
 		// Consume every press even out of reach, so one made while walking in
 		// doesn't fire the moment the player arrives.
 		if (!input.consumePress("KeyE") || !near) return;
 		this.open();
-	}
-
-	/** Swallow interact presses while a modal owns input, so closing one does
-	 * not immediately reopen the barn. */
-	suspend(input: InputManager): void {
-		input.consumePress("KeyE", "Enter");
-		this.setPrompt(null);
 	}
 
 	/** Opens on a click that lands on the barn; true when it handled the click. */
@@ -61,12 +44,5 @@ export class FarmBarn {
 
 	private open(): void {
 		useInventoryStore.getState().setBarnOpen(true);
-		this.onMessage("Barn storage.");
-	}
-
-	private setPrompt(prompt: string | null): void {
-		if (this.activePrompt === prompt) return;
-		this.activePrompt = prompt;
-		this.onMessage(prompt);
 	}
 }

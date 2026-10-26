@@ -25,12 +25,12 @@ async function openBarn(page: Page) {
  * barrels beside the barn, then the up-right diagonal reaches its base.
  */
 async function walkToBarn(page: Page) {
-	const hint = page.getByTestId("farm-hint");
+	const prompt = page.getByTestId("travel-prompt");
 	await page.keyboard.down("w");
 	await page.waitForTimeout(700);
 	await page.keyboard.down("d");
 	try {
-		await expect(hint).toContainText("open the barn", { timeout: 15_000 });
+		await expect(prompt).toContainText("open the barn", { timeout: 15_000 });
 	} finally {
 		await page.keyboard.up("w");
 		await page.keyboard.up("d");
@@ -77,10 +77,10 @@ test("standing at the barn and pressing E opens storage", async ({ page }) => {
 	await page.keyboard.press("e");
 	await expect(page.getByTestId("barn-window")).toBeVisible();
 
-	// Escape closes it, and the hint returns while still standing at the barn.
+	// Escape closes it, and the prompt remains while still at the barn.
 	await page.keyboard.press("Escape");
 	await expect(page.getByTestId("barn-window")).toHaveCount(0);
-	await expect(page.getByTestId("farm-hint")).toContainText("open the barn");
+	await expect(page.getByTestId("travel-prompt")).toContainText("open the barn");
 });
 
 test("barn storage survives a reload", async ({ page }) => {
