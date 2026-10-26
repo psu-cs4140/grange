@@ -90,6 +90,44 @@ defmodule GrangeWeb.FarmChannelTest do
     assert reply.error == "not your farm"
   end
 
+  test "the owner can store and retrieve items from the barn" do
+    FarmStore.ensure("Alice")
+
+    {:ok, _reply, socket} =
+      signed_socket("Alice") |> subscribe_and_join(GrangeWeb.FarmChannel, "farm:Alice")
+
+    ref =
+      push(socket, "barnAction", %{
+        "action" => %{"kind" => "deposit", "item" => "tomato", "count" => 2}
+      })
+
+    assert_reply(ref, :ok)
+    assert_broadcast("farmUpdate", %{farm: %{storage: %{"tomato" => 2}}})
+
+    ref =
+      push(socket, "barnAction", %{
+        "action" => %{"kind" => "withdraw", "item" => "tomato", "count" => 1}
+      })
+
+    assert_reply(ref, :ok)
+    assert_broadcast("farmUpdate", %{farm: %{storage: %{"tomato" => 1}}})
+  end
+
+  test "a visitor cannot touch the barn" do
+    FarmStore.ensure("Alice")
+
+    {:ok, _reply, socket} =
+      signed_socket("Bob") |> subscribe_and_join(GrangeWeb.FarmChannel, "farm:Alice")
+
+    ref =
+      push(socket, "barnAction", %{
+        "action" => %{"kind" => "deposit", "item" => "tomato", "count" => 1}
+      })
+
+    assert_reply(ref, :error, reply)
+    assert reply.error == "not your farm"
+  end
+
   test "a signed-out socket cannot act" do
     FarmStore.ensure("Alice")
 

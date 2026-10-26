@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { countItem, useInventoryStore } from "./inventoryStore";
+import { GRID_SIZE, HOTBAR_SIZE, countItem, useInventoryStore } from "./inventoryStore";
 import { ITEMS } from "./items";
 
 beforeEach(() => {
@@ -34,6 +34,10 @@ describe("inventory slots", () => {
 	it("grants every item at max stack for admins", () => {
 		useInventoryStore.getState().grantAllItems();
 		const { hotbar, grid } = useInventoryStore.getState();
+		// Neither list may overflow its rendered slot count, or the extra items
+		// would exist in the store but be unreachable in the UI.
+		expect(hotbar).toHaveLength(HOTBAR_SIZE);
+		expect(grid).toHaveLength(GRID_SIZE);
 		const filled = [...hotbar, ...grid].filter((s) => s.itemId);
 		const held = new Set(filled.map((s) => s.itemId));
 		expect(held).toEqual(new Set(Object.keys(ITEMS)));

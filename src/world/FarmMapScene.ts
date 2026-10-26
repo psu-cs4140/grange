@@ -9,6 +9,7 @@ import { CropLayer } from "./cropLayer";
 import { FenceLayer } from "./fenceRendering";
 import { actOnFence, selectedFarmItem } from "./fenceActions";
 import { handleFarmPropClick } from "./farmPropActions";
+import { FarmBarn } from "./FarmBarn";
 import { FarmPropLayer } from "./farmPropLayer";
 import { FarmTravel } from "./FarmTravel";
 import { addFarmerGraphics, updateFarmerGraphics } from "./farmerSprite";
@@ -57,6 +58,7 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 	private deactivated = false;
 	private lastTomatoes = -1;
 	private readonly travel: FarmTravel;
+	private readonly barn: FarmBarn;
 	private train!: TrainController;
 
 	constructor(
@@ -67,6 +69,12 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 	) {
 		super();
 		this.travel = new FarmTravel(onPromptChange, onAreaChange);
+		this.barn = new FarmBarn(isOwner, (message) => this.setMessage(message));
+	}
+
+	private setMessage(message: string): void {
+		this.message = message;
+		this.emitHud();
 	}
 
 	override onInitialize(engine: ex.Engine): void {
@@ -128,6 +136,7 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 		pointers.primary.on("down", (evt) => {
 			if (this.deactivated || isInventoryBlockingInput()) return;
 			const item = selectedFarmItem();
+			if (this.barn.handleClick(evt.worldPos, item, this.farmProps)) return;
 			this.painting = item === "hoe" || item === "seed-bag" ||
 				item === "watering-can" || item === "scythe";
 			this.strokeTiles.clear();
@@ -145,14 +154,13 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 
 		// Center camera initially
 		this.camera.pos = ex.vec(MAP_WIDTH / 2, MAP_HEIGHT / 2);
-		this.message = TOOL_HINTS[useGameStore.getState().tool] ?? this.message;
-		this.emitHud();
+		this.setMessage(TOOL_HINTS[useGameStore.getState().tool]);
 	}
 
 	setTool(tool: FarmToolId): void {
 		useGameStore.getState().setTool(tool);
-		this.message = TOOL_HINTS[tool];
-		this.emitHud();
+		this.setMessage(TOOL_HINTS[tool]);
+		this.barn.refresh();
 	}
 
 	override onActivate(
@@ -169,10 +177,12 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 		this.player.graphics.visible = this.train.isParked();
 
 		// Freeze and hide the player while the inventory modal captures input,
-		// or while the train carries them in or out.
+		// or while the train carries them in or out. Swallow any interact press
+		// so closing the modal doesn't immediately reopen the barn.
 		if (isInventoryBlockingInput() || !this.train.isParked()) {
 			this.player.vel = ex.vec(0, 0);
 			updateFarmerGraphics(this.player, { x: 0, y: 0 });
+			this.barn.suspend(this.inputManager);
 			return;
 		}
 
@@ -186,11 +196,12 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 
 		if (this.isOwner && this.inputManager.consumePressed("Space")) {
 			actOnPlayerFarmTile(this.owner, this.player.pos.x, this.player.pos.y,
-				(message) => { this.message = message; this.emitHud(); });
+				(message) => this.setMessage(message));
 		}
 		this.syncTilesFromServer();
 		this.farmProps.set(useGameStore.getState().activeFarm?.prop_overrides ?? []);
 		this.fences.set(useGameStore.getState().activeFarm?.fences ?? []);
+		this.barn.update(this.player, this.inputManager, this.farmProps);
 	}
 
 	override onDeactivate(): void {
@@ -199,6 +210,7 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 		this.painting = false;
 		this.inputManager?.destroy();
 		this.travel.deactivate();
+		this.barn.deactivate();
 	}
 
 	private applyToolAt(worldPos: ex.Vector): void {

@@ -10,19 +10,17 @@ defmodule Grange.FarmStore do
 
   import Ecto.Query
 
-  alias Grange.{Farm, FarmFence, FarmProp, FarmProps, FarmRecord, Repo, Tile}
+  alias Grange.{BarnStorage, Farm, FarmFence, FarmProp, FarmProps, FarmRecord, Repo, Tile}
 
   @lobby_topic "lobby"
 
   @spec ensure(String.t()) :: map()
   def ensure(owner) do
-    case Repo.get(FarmRecord, owner) do
-      nil ->
-        %FarmRecord{owner: owner, tomatoes: 0} |> Repo.insert!()
-        broadcast_change(owner)
-
-      _farm ->
-        :ok
+    if has_farm?(owner) do
+      :ok
+    else
+      %FarmRecord{owner: owner} |> Repo.insert!()
+      broadcast_change(owner)
     end
 
     view(owner)
@@ -45,7 +43,8 @@ defmodule Grange.FarmStore do
           fences: fences(owner),
           fence_count: farm.fence_count,
           prop_overrides: FarmProps.overrides(owner),
-          prop_inventory: FarmProps.inventory(owner)
+          prop_inventory: FarmProps.inventory(owner),
+          storage: BarnStorage.inventory(farm)
         }
     end
   end
@@ -66,22 +65,30 @@ defmodule Grange.FarmStore do
 
   @spec prop_action(String.t(), map()) :: {:ok, map()} | {:error, String.t()}
   def prop_action(owner, action) when is_map(action) do
-    result = Repo.transaction(fn -> run_prop_action(owner, action) end)
-
-    case result do
-      {:ok, :ok} ->
-        broadcast_change(owner)
-        {:ok, view(owner)}
-
-      {:ok, {:error, reason}} ->
-        {:error, reason}
-
-      {:error, _} ->
-        {:error, "could not update object"}
+    case Repo.transaction(fn -> run_prop_action(owner, action) end) do
+      {:ok, :ok} -> changed(owner)
+      {:ok, {:error, reason}} -> {:error, reason}
+      {:error, _} -> {:error, "could not update object"}
     end
   end
 
   def prop_action(_owner, _action), do: {:error, "invalid prop action"}
+
+  @spec storage_action(String.t(), map()) :: {:ok, map()} | {:error, String.t()}
+  def storage_action(owner, action) when is_map(action) do
+    case BarnStorage.action(owner, action) do
+      {:ok, :ok} -> changed(owner)
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  def storage_action(_owner, _action), do: {:error, "invalid barn action"}
+
+  # Broadcast a successful mutation and answer with the fresh farm view.
+  defp changed(owner) do
+    broadcast_change(owner)
+    {:ok, view(owner)}
+  end
 
   defp run_prop_action(owner, action) do
     case fetch(action, "kind") do
@@ -109,8 +116,7 @@ defmodule Grange.FarmStore do
         |> Ecto.Changeset.change(tomatoes: tomatoes - count)
         |> Repo.update!()
 
-        broadcast_change(owner)
-        {:ok, view(owner)}
+        changed(owner)
 
       %FarmRecord{} ->
         {:error, "not enough tomatoes"}
@@ -162,15 +168,9 @@ defmodule Grange.FarmStore do
 
   defp apply_action(owner, kind, x, y) do
     case Repo.transaction(fn -> mutate(owner, kind, x, y) end) do
-      {:ok, :ok} ->
-        broadcast_change(owner)
-        {:ok, view(owner)}
-
-      {:ok, {:error, reason}} ->
-        {:error, reason}
-
-      {:error, _reason} ->
-        {:error, "could not update farm"}
+      {:ok, :ok} -> changed(owner)
+      {:ok, {:error, reason}} -> {:error, reason}
+      {:error, _reason} -> {:error, "could not update farm"}
     end
   end
 

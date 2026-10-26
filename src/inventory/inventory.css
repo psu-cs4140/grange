@@ -232,6 +232,7 @@ button.hud-prompt:focus-visible {
 	padding: 1rem;
 	background: rgba(10, 7, 4, 0.6);
 	backdrop-filter: blur(2px);
+	pointer-events: auto;
 }
 
 .inv-modal {
@@ -398,5 +399,74 @@ button.hud-prompt:focus-visible {
 
 	.hud-bottom-right {
 		display: none;
+	}
+}
+
+/* Barn storage window: player inventory on the left, storage on the right. */
+
+.barn-modal {
+	width: min(60rem, 100%);
+}
+
+.barn-body {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 1rem;
+	padding: 1rem;
+}
+
+.barn-section {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	min-width: 0;
+}
+
+.barn-heading {
+	font-size: 0.8rem;
+	text-transform: uppercase;
+	letter-spacing: 0.1em;
+	color: #9a8b72;
+}
+
+.barn-slot-wrap {
+	position: relative;
+}
+
+.barn-store {
+	position: absolute;
+	right: -0.2rem;
+	bottom: -0.45rem;
+	padding: 0.15rem 0.3rem;
+	border: 1px solid rgba(240, 192, 64, 0.6);
+	border-radius: 0.25rem;
+	background: rgba(38, 28, 20, 0.95);
+	color: #f0c040;
+	font-size: 0.55rem;
+	line-height: 1;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	cursor: pointer;
+	z-index: 1;
+}
+
+.barn-store:hover {
+	background: rgba(240, 192, 64, 0.2);
+	color: #ffe680;
+}
+
+.barn-hint {
+	padding: 0 1rem;
+}
+
+.barn-message {
+	padding: 0 1rem 1rem;
+	color: #a7c957;
+	font-size: 0.78rem;
+}
+
+@media (max-width: 900px) {
+	.barn-body {
+		grid-template-columns: 1fr;
 	}
 }

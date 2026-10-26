@@ -42,15 +42,23 @@ function buildInitialHotbar(): InventorySlot[] {
 
 /**
  * Every item in the game, one stack at its max size. Used for admin accounts,
- * which are handed the full inventory on sign-in.
+ * which are handed the full catalog on sign-in. The hotbar fills first and any
+ * overflow spills into the inventory grid; anything beyond total capacity is
+ * dropped so the arrays never outgrow the slots the UI actually renders.
  */
-function buildAdminHotbar(): InventorySlot[] {
-	const order = Object.keys(ITEMS) as ItemId[];
+function buildAdminInventory(): {
+	grid: InventorySlot[];
+	hotbar: InventorySlot[];
+} {
 	const hotbar = Array.from({ length: HOTBAR_SIZE }, emptySlot);
+	const grid = Array.from({ length: GRID_SIZE }, emptySlot);
+	const order = Object.keys(ITEMS) as ItemId[];
 	order.forEach((itemId, index) => {
-		hotbar[index] = stack(itemId, ITEMS[itemId].maxStack);
+		const slot = stack(itemId, ITEMS[itemId].maxStack);
+		if (index < HOTBAR_SIZE) hotbar[index] = slot;
+		else if (index - HOTBAR_SIZE < GRID_SIZE) grid[index - HOTBAR_SIZE] = slot;
 	});
-	return hotbar;
+	return { grid, hotbar };
 }
 
 interface InventoryState {
@@ -58,9 +66,11 @@ interface InventoryState {
 	hotbar: InventorySlot[];
 	selectedHotbar: number;
 	inventoryOpen: boolean;
+	barnOpen: boolean;
 	selectHotbar: (index: number) => void;
 	setInventoryOpen: (open: boolean) => void;
 	toggleInventory: () => void;
+	setBarnOpen: (open: boolean) => void;
 	moveStack: (from: SlotRef, to: SlotRef) => void;
 	splitHalf: (from: SlotRef, to: SlotRef) => void;
 	addItem: (itemId: ItemId, count: number) => number;
@@ -81,6 +91,7 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
 	hotbar: buildInitialHotbar(),
 	selectedHotbar: 0,
 	inventoryOpen: false,
+	barnOpen: false,
 
 	selectHotbar: (index) => {
 		if (index < 0 || index >= HOTBAR_SIZE) return;
@@ -89,6 +100,7 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
 
 	setInventoryOpen: (open) => set({ inventoryOpen: open }),
 	toggleInventory: () => set((s) => ({ inventoryOpen: !s.inventoryOpen })),
+	setBarnOpen: (open) => set({ barnOpen: open }),
 
 	moveStack: (from, to) => {
 		if (from.area === to.area && from.index === to.index) return;
@@ -224,8 +236,7 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
 
 	grantAllItems: () =>
 		set({
-			grid: Array.from({ length: GRID_SIZE }, emptySlot),
-			hotbar: buildAdminHotbar(),
+			...buildAdminInventory(),
 			selectedHotbar: 0,
 			inventoryOpen: false,
 		}),
@@ -263,16 +274,18 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
 			hotbar: buildInitialHotbar(),
 			selectedHotbar: 0,
 			inventoryOpen: false,
+			barnOpen: false,
 		}),
 }));
 
 /**
  * Excalibur scene polls this to freeze movement while an overlay captures
- * input (inventory modal or pause menu).
+ * input (inventory modal, barn storage, or pause menu).
  */
 export function isInventoryBlockingInput(): boolean {
 	return (
 		useInventoryStore.getState().inventoryOpen ||
+		useInventoryStore.getState().barnOpen ||
 		usePauseStore.getState().paused
 	);
 }
@@ -286,4 +299,18 @@ export function countItem(
 		if (slot.itemId === itemId) total += slot.count;
 	}
 	return total;
+}
+
+/** How many more of an item the inventory can hold across all slots. */
+export function freeSpaceFor(
+	state: Pick<InventoryState, "grid" | "hotbar">,
+	itemId: ItemId,
+): number {
+	const max = ITEMS[itemId].maxStack;
+	let space = 0;
+	for (const slot of [...state.hotbar, ...state.grid]) {
+		if (!slot.itemId) space += max;
+		else if (slot.itemId === itemId) space += Math.max(0, max - slot.count);
+	}
+	return space;
 }

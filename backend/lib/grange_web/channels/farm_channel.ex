@@ -45,6 +45,11 @@ defmodule GrangeWeb.FarmChannel do
   end
 
   @impl true
+  def handle_in("barnAction", %{"action" => action}, socket) do
+    authorize(socket, fn owner -> barn_act(socket, owner, action) end)
+  end
+
+  @impl true
   def handle_out(event, payload, socket) do
     push(socket, event, payload)
     {:noreply, socket}
@@ -77,6 +82,13 @@ defmodule GrangeWeb.FarmChannel do
 
   defp sell(socket, owner, count) do
     case FarmStore.sell_tomatoes(owner, count) do
+      {:ok, _farm} -> {:reply, :ok, socket}
+      {:error, reason} -> {:reply, {:error, %{error: reason}}, socket}
+    end
+  end
+
+  defp barn_act(socket, owner, action) do
+    case FarmStore.storage_action(owner, action) do
       {:ok, _farm} -> {:reply, :ok, socket}
       {:error, reason} -> {:reply, {:error, %{error: reason}}, socket}
     end
