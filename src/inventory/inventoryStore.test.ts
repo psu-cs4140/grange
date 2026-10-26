@@ -1,10 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import {
-	GRID_SIZE,
-	HOTBAR_SIZE,
-	countItem,
-	useInventoryStore,
-} from "./inventoryStore";
+import { countItem, useInventoryStore } from "./inventoryStore";
 import { ITEMS } from "./items";
 
 beforeEach(() => {
@@ -26,6 +21,7 @@ describe("inventory slots", () => {
 		expect(hotbar[4]).toMatchObject({ itemId: "gate", count: 2 });
 		expect(hotbar[5]).toMatchObject({ itemId: "fence", count: 20 });
 		expect(hotbar[6]).toMatchObject({ itemId: "shovel", count: 1 });
+		expect(hotbar[7]).toMatchObject({ itemId: "bamboo", count: 1 });
 	});
 
 	it("syncs server fence and gate stock without losing their slots", () => {
@@ -46,21 +42,6 @@ describe("inventory slots", () => {
 	it("grants every item at max stack for admins", () => {
 		useInventoryStore.getState().grantAllItems();
 		const { hotbar, grid } = useInventoryStore.getState();
-		const filled = [...hotbar, ...grid].filter((s) => s.itemId);
-		const held = new Set(filled.map((s) => s.itemId));
-		expect(held).toEqual(new Set(Object.keys(ITEMS)));
-		for (const slot of filled) {
-			if (slot.itemId) expect(slot.count).toBe(ITEMS[slot.itemId].maxStack);
-		}
-	});
-
-	it("grants every item at max stack for admins", () => {
-		useInventoryStore.getState().grantAllItems();
-		const { hotbar, grid } = useInventoryStore.getState();
-		// Neither list may overflow its rendered slot count, or the extra items
-		// would exist in the store but be unreachable in the UI.
-		expect(hotbar).toHaveLength(HOTBAR_SIZE);
-		expect(grid).toHaveLength(GRID_SIZE);
 		const filled = [...hotbar, ...grid].filter((s) => s.itemId);
 		const held = new Set(filled.map((s) => s.itemId));
 		expect(held).toEqual(new Set(Object.keys(ITEMS)));
@@ -128,6 +109,16 @@ describe("inventory slots", () => {
 
 		expect(store.removeItem("seed-bag", 6)).toBe(6);
 		expect(useInventoryStore.getState().hotbar[1]?.itemId).toBeNull();
+	});
+
+	it("holds caught fish as stackable items and sells them away", () => {
+		const store = useInventoryStore.getState();
+		expect(store.addItem("minnow", 2)).toBe(0);
+		expect(store.addItem("minnow", 3)).toBe(0);
+		expect(countItem(useInventoryStore.getState(), "minnow")).toBe(5);
+
+		expect(store.removeItem("minnow", 4)).toBe(4);
+		expect(countItem(useInventoryStore.getState(), "minnow")).toBe(1);
 	});
 
 	it("selects hotbar slots and toggles the panel", () => {

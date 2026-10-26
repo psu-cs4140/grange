@@ -21,12 +21,11 @@ export class FarmBarn {
 		return near ? PROMPT : null;
 	}
 
-	/** Opens on E at the barn; run after gate input so a gate wins. */
+	/** Opens on E at the barn; run after gate input so a gate wins. Fishing
+	 * drains E when the barn is out of reach, so only claim it here. */
 	update(player: ex.Actor, input: InputManager, props: FarmPropLayer): void {
 		const near = this.isOwner && props.barnNear(player.pos.x, player.pos.y);
-		// Consume every press even out of reach, so one made while walking in
-		// doesn't fire the moment the player arrives.
-		if (!input.consumePress("KeyE") || !near) return;
+		if (!near || !input.consumePress("KeyE")) return;
 		this.open();
 	}
 

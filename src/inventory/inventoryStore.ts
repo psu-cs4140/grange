@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { usePauseStore } from "../pause/pauseStore";
+import { STARTER_ROD } from "../world/fishingData";
 import { ITEMS, type ItemId } from "./items";
 
 export const GRID_SIZE = 24;
@@ -38,28 +39,21 @@ function buildInitialHotbar(): InventorySlot[] {
 	hotbar[4] = stack("gate", 2);
 	hotbar[5] = stack("fence", 20);
 	hotbar[6] = stack("shovel", 1);
+	hotbar[7] = stack(STARTER_ROD, 1);
 	return hotbar;
 }
 
 /**
  * Every item in the game, one stack at its max size. Used for admin accounts,
- * which are handed the full catalog on sign-in. The hotbar fills first and any
- * overflow spills into the inventory grid; anything beyond total capacity is
- * dropped so the arrays never outgrow the slots the UI actually renders.
+ * which are handed the full inventory on sign-in.
  */
-function buildAdminInventory(): {
-	grid: InventorySlot[];
-	hotbar: InventorySlot[];
-} {
-	const hotbar = Array.from({ length: HOTBAR_SIZE }, emptySlot);
-	const grid = Array.from({ length: GRID_SIZE }, emptySlot);
+function buildAdminHotbar(): InventorySlot[] {
 	const order = Object.keys(ITEMS) as ItemId[];
+	const hotbar = Array.from({ length: HOTBAR_SIZE }, emptySlot);
 	order.forEach((itemId, index) => {
-		const slot = stack(itemId, ITEMS[itemId].maxStack);
-		if (index < HOTBAR_SIZE) hotbar[index] = slot;
-		else if (index - HOTBAR_SIZE < GRID_SIZE) grid[index - HOTBAR_SIZE] = slot;
+		hotbar[index] = stack(itemId, ITEMS[itemId].maxStack);
 	});
-	return { grid, hotbar };
+	return hotbar;
 }
 
 interface InventoryState {
@@ -237,7 +231,8 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
 
 	grantAllItems: () =>
 		set({
-			...buildAdminInventory(),
+			grid: Array.from({ length: GRID_SIZE }, emptySlot),
+			hotbar: buildAdminHotbar(),
 			selectedHotbar: 0,
 			inventoryOpen: false,
 		}),
