@@ -97,16 +97,6 @@ defmodule Grange.FarmStore do
     with {:ok, :ok} <- FarmProps.action(owner, action), do: refresh(owner)
   end
 
-  @spec storage_action(String.t(), map()) :: {:ok, map()} | {:error, String.t()}
-  def storage_action(owner, action) when is_map(action) do
-    case BarnStorage.action(owner, action) do
-      {:ok, :ok} -> refresh(owner)
-      {:error, reason} -> {:error, reason}
-    end
-  end
-
-  def storage_action(_owner, _action), do: {:error, "invalid barn action"}
-
   @doc "Broadcasts the farm and returns its refreshed view."
   @spec refresh(String.t()) :: {:ok, map()}
   def refresh(owner) do
@@ -139,12 +129,7 @@ defmodule Grange.FarmStore do
 
   @spec reset() :: :ok
   def reset do
-    Repo.delete_all(Tile)
-    Repo.delete_all(BarnItem)
-    Repo.delete_all(FarmFence)
-    Repo.delete_all(FarmGate)
-    Repo.delete_all(FarmProp)
-    Repo.delete_all(FarmRecord)
+    Enum.each([Tile, BarnItem, FarmFence, FarmGate, FarmProp, FarmRecord], &Repo.delete_all/1)
     :ok
   end
 

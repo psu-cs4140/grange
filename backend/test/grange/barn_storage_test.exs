@@ -10,7 +10,10 @@ defmodule Grange.BarnStorageTest do
   end
 
   defp action(kind, item, count) do
-    FarmStore.storage_action("Alice", %{"kind" => kind, "item" => item, "count" => count})
+    with {:ok, :ok} <-
+           BarnStorage.action("Alice", %{"kind" => kind, "item" => item, "count" => count}) do
+      FarmStore.refresh("Alice")
+    end
   end
 
   test "a new farm has an empty barn" do
@@ -77,7 +80,7 @@ defmodule Grange.BarnStorageTest do
 
   test "actions on a missing farm are rejected" do
     assert {:error, "farm not found"} =
-             FarmStore.storage_action("Nobody", %{
+             BarnStorage.action("Nobody", %{
                "kind" => "deposit",
                "item" => "tomato",
                "count" => 1

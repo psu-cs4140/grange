@@ -8,7 +8,7 @@ defmodule GrangeWeb.FarmChannel do
 
   use Phoenix.Channel
 
-  alias Grange.{FarmGateActions, FarmStore}
+  alias Grange.{BarnStorage, FarmGateActions, FarmStore}
 
   @impl true
   def join("farm:" <> owner, _payload, socket) do
@@ -103,8 +103,10 @@ defmodule GrangeWeb.FarmChannel do
   end
 
   defp barn_act(socket, owner, action) do
-    case FarmStore.storage_action(owner, action) do
-      {:ok, _farm} -> {:reply, :ok, socket}
+    with {:ok, :ok} <- BarnStorage.action(owner, action),
+         {:ok, _farm} <- FarmStore.refresh(owner) do
+      {:reply, :ok, socket}
+    else
       {:error, reason} -> {:reply, {:error, %{error: reason}}, socket}
     end
   end
