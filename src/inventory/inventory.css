@@ -470,3 +470,40 @@ button.hud-prompt:focus-visible {
 		grid-template-columns: 1fr;
 	}
 }
+
+/* Expanded player inventory: a wider modal with an 8-column grid and larger
+   slots. Scoped to .inv-modal-wide so the barn storage window keeps its own
+   layout. */
+.inv-modal-wide {
+	width: min(56rem, 100%);
+	max-height: min(42rem, 100%);
+}
+
+.inv-modal-wide .inv-body {
+	grid-template-columns: 13rem 1fr;
+}
+
+.inv-modal-wide .inv-grid {
+	grid-template-columns: repeat(8, 3.25rem);
+	gap: 0.5rem;
+	overflow-x: auto;
+}
+
+.inv-modal-wide .inv-hotbar-row {
+	grid-template-columns: repeat(10, 3.25rem);
+	gap: 0.5rem;
+}
+
+.inv-modal-wide .inv-slot {
+	width: 3.25rem;
+	height: 3.25rem;
+}
+
+.inv-modal-wide .inv-icon {
+	width: 2.25rem;
+	height: 2.25rem;
+}
+
+.inv-modal-wide .inv-emoji {
+	font-size: 1.8rem;
+}
