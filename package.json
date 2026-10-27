@@ -35,7 +35,7 @@
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.30.6",
     "tailwindcss": "^4.3.3",
-    "vite": "^5.4.21",
+    "vite": "^6.4.4",
     "zustand": "^4.5.7"
   },
   "devDependencies": {
@@ -47,6 +47,6 @@
     "@types/react-dom": "^18.3.7",
     "concurrently": "^9.2.5",
     "typescript": "^5.9.3",
-    "vitest": "^2.1.9"
+    "vitest": "^4.1.11"
   }
 }
