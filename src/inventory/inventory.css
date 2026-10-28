@@ -299,7 +299,10 @@ button.hud-prompt:focus-visible {
 
 .inv-hotbar-row {
 	display: grid;
-	grid-template-columns: repeat(10, 3rem);
+	/* Wrap to the container width so a half-width column (e.g. the barn
+	   window's "Your inventory" panel) never clips the rightmost slots. */
+	grid-template-columns: repeat(auto-fit, 3rem);
+	justify-content: start;
 	gap: 0.375rem;
 	padding-top: 0.75rem;
 	border-top: 1px solid rgba(243, 231, 208, 0.15);
@@ -408,7 +411,7 @@ button.hud-prompt:focus-visible {
 /* Barn storage window: player inventory on the left, storage on the right. */
 
 .barn-modal {
-	width: min(60rem, 100%);
+	width: min(70rem, 100%);
 }
 
 .barn-body {
