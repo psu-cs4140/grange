@@ -12,6 +12,7 @@ import { FencePlacementPreview } from "./FencePlacementPreview";
 import { actOnFence, selectedFarmItem } from "./fenceActions";
 import { performFarmAction } from "./farmActionRunner";
 import { handleFarmPropClick, placeFarmProp } from "./farmPropActions";
+import { FarmBarn } from "./FarmBarn";
 import { FarmPropLayer } from "./farmPropLayer";
 import { FarmPlacementPreview } from "./FarmPlacementPreview";
 import { FarmTravel } from "./FarmTravel";
@@ -63,6 +64,7 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 	private lastWorldPos: ex.Vector | null = null;
 	private deactivated = false;
 	private readonly travel: FarmTravel;
+	private readonly barn: FarmBarn;
 	private readonly fishing: FarmFishing;
 	private train!: TrainController;
 
@@ -83,6 +85,7 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 			(prompt) => this.fishing.setTravelPrompt(prompt),
 			onAreaChange,
 		);
+		this.barn = new FarmBarn(isOwner);
 	}
 
 	override onInitialize(engine: ex.Engine): void {
@@ -123,6 +126,7 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 		pointers.primary.on("down", (evt) => {
 			if (this.deactivated || isInventoryBlockingInput()) return;
 			const item = selectedFarmItem();
+			if (this.barn.handleClick(evt.worldPos, item, this.farmProps)) return;
 			const farm = useGameStore.getState().activeFarm;
 			if (item && isMovablePropAsset(item) && this.isOwner && farm) {
 				if ((farm.prop_inventory[item] ?? 0) > 0)
@@ -168,8 +172,7 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 	}
 
 	setHeldTool(tool: FarmToolId | null): void {
-		this.message = tool ? TOOL_HINTS[tool] : "Select a tool or item first.";
-		this.emitHud();
+		this.report(tool ? TOOL_HINTS[tool] : "Select a tool or item first.");
 	}
 
 	/** The hotbar reports a slot change so the combo tracker grants its grace. */
@@ -199,6 +202,8 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 
 		// Freeze and hide the player while the inventory modal captures input,
 		// while the fishing overlay is open, or while the train carries them.
+		// Swallow interact presses so closing one doesn't immediately reopen
+		// the barn.
 		if (
 			isInventoryBlockingInput() ||
 			this.fishing.isPaused ||
@@ -206,6 +211,7 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 		) {
 			this.player.vel = ex.vec(0, 0);
 			updateFarmerGraphics(this.player, { x: 0, y: 0 });
+			this.inputManager.consumePress("KeyE", "Enter");
 			return;
 		}
 
@@ -214,15 +220,22 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 		updateFarmerGraphics(this.player, dir);
 
 		const gate = nearbyGate(farm?.gates ?? [], this.player.pos);
-		this.travel.update(this.player, this.inputManager, engine, this.train, gate?.prompt ?? null);
+		this.travel.update(this.player, this.inputManager, engine, this.train,
+			gate?.prompt ?? this.barn.prompt(this.player, this.farmProps));
 		if (gate && this.inputManager.consumePress("KeyE", "Enter")) {
 			toggleGate(this.owner, gate.gate, (message) => this.report(message));
 		}
+		// The barn claims E before fishing drains it, but only while in reach.
+		this.barn.update(this.player, this.inputManager, this.farmProps);
 		this.fishing.update(this.player.pos.y, this.inputManager);
 
 		if (this.isOwner) farmActionOnSpace(this.inputManager, this.player.pos,
 			(column, row) => this.performAction(column, row));
-		this.syncTilesFromServer();
+		const changed = this.tileSync.sync(useGameStore.getState().activeFarm);
+		if (changed) {
+			if (this.lastWorldPos) this.updateHover(this.lastWorldPos);
+			else this.emitHud();
+		}
 		this.tileSync.syncGrowing(useGameStore.getState().activeFarm, Date.now());
 		this.sweepFx.update(delta);
 		this.combo.update();
@@ -261,11 +274,7 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 		if (this.strokeTiles.has(strokeKey)) return;
 		this.strokeTiles.add(strokeKey);
 
-		if (!this.isOwner) {
-			this.message = "Visitors can't farm here.";
-			this.emitHud();
-			return;
-		}
+		if (!this.isOwner) { this.report("Visitors can't farm here."); return; }
 
 		const item = selectedFarmItem();
 		if (
@@ -312,13 +321,6 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 	private report(text: string): void {
 		this.message = text;
 		this.emitHud();
-	}
-
-	private syncTilesFromServer(): void {
-		const changed = this.tileSync.sync(useGameStore.getState().activeFarm);
-		if (!changed) return;
-		if (this.lastWorldPos) this.updateHover(this.lastWorldPos);
-		else this.emitHud();
 	}
 
 	private updateHover(worldPos: ex.Vector): void {

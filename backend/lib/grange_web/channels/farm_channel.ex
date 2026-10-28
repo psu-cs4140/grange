@@ -8,7 +8,7 @@ defmodule GrangeWeb.FarmChannel do
 
   use Phoenix.Channel
 
-  alias Grange.{FarmGateActions, FarmStore}
+  alias Grange.{BarnStorage, FarmGateActions, FarmStore}
 
   @impl true
   def join("farm:" <> owner, _payload, socket) do
@@ -53,6 +53,11 @@ defmodule GrangeWeb.FarmChannel do
   end
 
   @impl true
+  def handle_in("barnAction", %{"action" => action}, socket) do
+    authorize(socket, fn owner -> barn_act(socket, owner, action) end)
+  end
+
+  @impl true
   def handle_out(event, payload, socket) do
     push(socket, event, payload)
     {:noreply, socket}
@@ -93,6 +98,15 @@ defmodule GrangeWeb.FarmChannel do
   defp sell(socket, owner, item, count) do
     case FarmStore.sell(owner, item, count) do
       {:ok, _farm} -> {:reply, :ok, socket}
+      {:error, reason} -> {:reply, {:error, %{error: reason}}, socket}
+    end
+  end
+
+  defp barn_act(socket, owner, action) do
+    with {:ok, :ok} <- BarnStorage.action(owner, action),
+         {:ok, _farm} <- FarmStore.refresh(owner) do
+      {:reply, :ok, socket}
+    else
       {:error, reason} -> {:reply, {:error, %{error: reason}}, socket}
     end
   end

@@ -17,6 +17,7 @@ defmodule Grange.FarmStore do
   alias Grange.{
     Barn,
     BarnItem,
+    BarnStorage,
     Crops,
     Farm,
     FarmAction,
@@ -72,7 +73,8 @@ defmodule Grange.FarmStore do
           gates: FarmGates.list(owner),
           gate_count: farm.gate_count,
           prop_overrides: FarmProps.overrides(owner),
-          prop_inventory: FarmProps.inventory(owner)
+          prop_inventory: FarmProps.inventory(owner),
+          storage: BarnStorage.inventory(farm)
         }
     end
   end
@@ -129,8 +131,10 @@ defmodule Grange.FarmStore do
   @spec reset() :: :ok
   def reset do
     # Child tables first so foreign keys are satisfied, then the farms.
-    [Tile, BarnItem, PlayerItem, FarmFence, FarmGate, FarmProp, FarmRecord]
-    |> Enum.each(&Repo.delete_all/1)
+    Enum.each(
+      [Tile, BarnItem, PlayerItem, FarmFence, FarmGate, FarmProp, FarmRecord],
+      &Repo.delete_all/1
+    )
 
     :ok
   end
@@ -365,9 +369,8 @@ defmodule Grange.FarmStore do
     broadcast_lobby()
   end
 
-  defp broadcast_farm(owner) do
-    GrangeWeb.Endpoint.broadcast("farm:" <> owner, "farmUpdate", %{farm: view(owner)})
-  end
+  defp broadcast_farm(owner),
+    do: GrangeWeb.Endpoint.broadcast("farm:" <> owner, "farmUpdate", %{farm: view(owner)})
 
   defp broadcast_lobby do
     GrangeWeb.Endpoint.broadcast(@lobby_topic, "farms", %{farms: summaries()})

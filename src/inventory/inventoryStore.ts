@@ -61,9 +61,11 @@ interface InventoryState {
 	hotbar: InventorySlot[];
 	selectedHotbar: number;
 	inventoryOpen: boolean;
+	barnOpen: boolean;
 	selectHotbar: (index: number) => void;
 	setInventoryOpen: (open: boolean) => void;
 	toggleInventory: () => void;
+	setBarnOpen: (open: boolean) => void;
 	moveStack: (from: SlotRef, to: SlotRef) => void;
 	splitHalf: (from: SlotRef, to: SlotRef) => void;
 	addItem: (itemId: ItemId, count: number) => number;
@@ -84,6 +86,7 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
 	hotbar: buildInitialHotbar(),
 	selectedHotbar: 0,
 	inventoryOpen: false,
+	barnOpen: false,
 
 	selectHotbar: (index) => {
 		if (index < 0 || index >= HOTBAR_SIZE) return;
@@ -92,6 +95,7 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
 
 	setInventoryOpen: (open) => set({ inventoryOpen: open }),
 	toggleInventory: () => set((s) => ({ inventoryOpen: !s.inventoryOpen })),
+	setBarnOpen: (open) => set({ barnOpen: open }),
 
 	moveStack: (from, to) => {
 		if (from.area === to.area && from.index === to.index) return;
@@ -267,16 +271,18 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
 			hotbar: buildInitialHotbar(),
 			selectedHotbar: 0,
 			inventoryOpen: false,
+			barnOpen: false,
 		}),
 }));
 
 /**
  * Excalibur scene polls this to freeze movement while an overlay captures
- * input (inventory modal or pause menu).
+ * input (inventory modal, barn storage, or pause menu).
  */
 export function isInventoryBlockingInput(): boolean {
 	return (
 		useInventoryStore.getState().inventoryOpen ||
+		useInventoryStore.getState().barnOpen ||
 		usePauseStore.getState().paused
 	);
 }
@@ -290,4 +296,18 @@ export function countItem(
 		if (slot.itemId === itemId) total += slot.count;
 	}
 	return total;
+}
+
+/** How many more of an item the inventory can hold across all slots. */
+export function freeSpaceFor(
+	state: Pick<InventoryState, "grid" | "hotbar">,
+	itemId: ItemId,
+): number {
+	const max = ITEMS[itemId].maxStack;
+	let space = 0;
+	for (const slot of [...state.hotbar, ...state.grid]) {
+		if (!slot.itemId) space += max;
+		else if (slot.itemId === itemId) space += Math.max(0, max - slot.count);
+	}
+	return space;
 }
