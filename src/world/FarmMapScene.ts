@@ -15,17 +15,17 @@ import { handleFarmPropClick, placeFarmProp } from "./farmPropActions";
 import { FarmPropLayer } from "./farmPropLayer";
 import { FarmPlacementPreview } from "./FarmPlacementPreview";
 import { FarmTravel } from "./FarmTravel";
-import { addFarmerGraphics, updateFarmerGraphics } from "./farmerSprite";
+import { FarmFishing } from "./farmFishing";
+import { updateFarmerGraphics } from "./farmerSprite";
+import { createFarmPlayer, followFarmPlayer } from "./farmSceneSetup";
 import { hoveredFarmTile, type FarmHoveredTile, type FarmHudSnapshot } from "./farmHud";
 import { TOOL_HINTS } from "./farmTools";
 import { FarmTileSync } from "./farmSceneTiles";
 import { nearbyGate, toggleGate } from "./gateInteraction";
 import { farmActionOnSpace } from "./farmSceneInput";
 import { InputManager } from "./InputManager";
-import { makeFarmTerrain, paintFarmTerrain } from "./farmTerrain";
+import { buildTerrain, paintFarmTerrain } from "./farmTerrain";
 import {
-	FARM_PLAYER_SPAWN,
-	farmBounds,
 	MAP_HEIGHT,
 	MAP_WIDTH,
 	props,
@@ -34,7 +34,6 @@ import {
 	ownsFarmTile,
 } from "./mapData";
 import { updateFarmPlayer } from "./playerMovement";
-import { terrainImage } from "./resources";
 import { setFarmLandLevel } from "./sceneObstacles";
 import { SweepFx } from "./sweepFx";
 import { findTrainRest, TrainController } from "./train";
@@ -65,6 +64,7 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 	private lastWorldPos: ex.Vector | null = null;
 	private deactivated = false;
 	private readonly travel: FarmTravel;
+	private readonly fishing: FarmFishing;
 	private train!: TrainController;
 
 	constructor(
@@ -72,28 +72,28 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 		private readonly isOwner: boolean,
 		onPromptChange: (prompt: string | null) => void,
 		onAreaChange: (area: WorldArea) => void,
+		onFish: () => void,
 	) {
 		super();
-		this.travel = new FarmTravel(onPromptChange, onAreaChange);
+		this.fishing = new FarmFishing(
+			isOwner,
+			onFish,
+			(prompt) => onPromptChange(prompt),
+		);
+		this.travel = new FarmTravel(
+			(prompt) => this.fishing.setTravelPrompt(prompt),
+			onAreaChange,
+		);
 	}
 
 	override onInitialize(engine: ex.Engine): void {
 		this.backgroundColor = ex.Color.fromHex("#79a44d");
 		this.inputManager = new InputManager();
 
-		this.sheet = ex.SpriteSheet.fromImageSource({
-			image: terrainImage,
-			grid: {
-				rows: 4,
-				columns: 4,
-				spriteWidth: TILE_SIZE,
-				spriteHeight: TILE_SIZE,
-			},
-		});
-
-		this.terrain = makeFarmTerrain();
 		this.paintedLandLevel = useGameStore.getState().activeFarm?.land_level ?? 0;
-		paintFarmTerrain(this.terrain, this.sheet, this.paintedLandLevel);
+		const { sheet, tileMap } = buildTerrain(this.paintedLandLevel);
+		this.sheet = sheet;
+		this.terrain = tileMap;
 		this.add(this.terrain);
 
 		this.tileSync = new FarmTileSync({
@@ -111,16 +111,7 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 		// The train is animated separately from the static prop layer.
 		this.train = new TrainController(findTrainRest(props), this);
 
-		// 4. Create Player Actor
-		this.player = new ex.Actor({
-			pos: ex.vec(FARM_PLAYER_SPAWN.x, FARM_PLAYER_SPAWN.y),
-			width: 32,
-			height: 32,
-			anchor: ex.vec(0.5, 1),
-			z: 200,
-		});
-		addFarmerGraphics(this.player);
-		this.add(this.player);
+		this.player = createFarmPlayer(this);
 
 		const pointers = engine.input.pointers;
 		pointers.primary.on("down", (evt) => {
@@ -207,8 +198,12 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 		this.fences.set(farm?.fences ?? [], farm?.gates ?? []);
 
 		// Freeze and hide the player while the inventory modal captures input,
-		// or while the train carries them in or out.
-		if (isInventoryBlockingInput() || !this.train.isParked()) {
+		// while the fishing overlay is open, or while the train carries them.
+		if (
+			isInventoryBlockingInput() ||
+			this.fishing.isPaused ||
+			!this.train.isParked()
+		) {
 			this.player.vel = ex.vec(0, 0);
 			updateFarmerGraphics(this.player, { x: 0, y: 0 });
 			return;
@@ -216,14 +211,7 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 
 		const dir = this.inputManager.getMovementVector();
 		updateFarmPlayer(this.player, dir, delta, this.combo.moveSpeed, farm?.land_level ?? 0);
-		const bounds = farmBounds(farm?.land_level ?? 0);
-		const minX = bounds.minColumn * TILE_SIZE;
-		const maxX = (bounds.maxColumn + 1) * TILE_SIZE;
-		const minY = bounds.minRow * TILE_SIZE;
-		this.camera.pos = ex.vec(
-			ex.clamp(this.player.pos.x, minX + MAP_WIDTH / 2, maxX - MAP_WIDTH / 2),
-			ex.clamp(this.player.pos.y, minY + MAP_HEIGHT / 2, MAP_HEIGHT / 2),
-		);
+		followFarmPlayer(this.camera, this.player.pos, farm?.land_level ?? 0);
 		updateFarmerGraphics(this.player, dir);
 
 		const gate = nearbyGate(farm?.gates ?? [], this.player.pos);
@@ -231,6 +219,7 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 		if (gate && this.inputManager.consumePress("KeyE", "Enter")) {
 			toggleGate(this.owner, gate.gate, (message) => this.report(message));
 		}
+		this.fishing.update(this.player.pos.y, this.inputManager);
 
 		if (this.isOwner) farmActionOnSpace(this.inputManager, this.player.pos,
 			(column, row) => this.performAction(column, row));
@@ -238,6 +227,18 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 		this.tileSync.syncGrowing(useGameStore.getState().activeFarm, Date.now());
 		this.sweepFx.update(delta);
 		this.combo.update();
+	}
+
+	/** Freezes the scene while the fishing overlay is open. */
+	setOverlayPaused(paused: boolean): void {
+		this.fishing.setPaused(paused);
+		// Drop keys pressed while the overlay had the keyboard so a held F
+		// cannot reopen the overlay the moment control returns.
+		this.inputManager?.clearPressed();
+		if (paused) {
+			this.player.vel = ex.vec(0, 0);
+			updateFarmerGraphics(this.player, { x: 0, y: 0 });
+		}
 	}
 
 	override onDeactivate(): void {

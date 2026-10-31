@@ -12,22 +12,22 @@ import { useGameStore } from "../store";
 import "../inventory/inventory.css";
 import { useInventoryStore } from "../inventory/inventoryStore";
 import { useInventoryKeys } from "../inventory/useInventoryKeys";
+import { useInventoryPersistence } from "../inventory/useInventoryPersistence";
 import { BankScene, type BankDesk } from "./BankScene";
 import { BankWindow } from "./BankWindow";
 import { bankResources } from "./bankResources";
-import { MOVABLE_PROP_ASSETS } from "./mapData";
 import { type CasinoOverlay, CasinoOverlays } from "./CasinoOverlays";
 import { CasinoScene } from "./CasinoScene";
-import { casinoResources } from "./casinoResources";
 import { ComboCounter } from "./ComboCounter";
+import { casinoResources } from "./casinoResources";
 import { FarmMapScene } from "./FarmMapScene";
+import { FishingOverlay } from "./FishingOverlay";
 import type { FarmHudSnapshot } from "./farmHud";
 import "./farmMap.css";
 import { MarketplaceScene } from "./MarketplaceScene";
 import { MarketWindow } from "./MarketWindow";
 import { LivestockMarketScene } from "./LivestockMarketScene";
 import { LivestockPurchaseOverlay } from "./LivestockPurchaseOverlay";
-import { livestockPens } from "./livestockData";
 import { livestockResources } from "./livestockResources";
 import { MAP_HEIGHT, MAP_WIDTH } from "./mapData";
 import { MARKETS } from "./marketData";
@@ -35,6 +35,7 @@ import { marketplaceResources } from "./marketplaceResources";
 import { resources } from "./resources";
 import { useBarnReconcile } from "./useBarnReconcile";
 import { useFarmMarket } from "./useFarmMarket";
+import { useFarmItemNotices, useFarmObjectInventory } from "./useFarmObjectInventory";
 import { useLivestockPurchase } from "./useLivestockPurchase";
 import type { WorldArea } from "./WalkingScene";
 
@@ -56,8 +57,8 @@ export default function FarmMap() {
 	const hotbar = useInventoryStore((s) => s.hotbar);
 	const heldItem = hotbar[selectedHotbar]?.itemId ?? null;
 	const heldTool = farmToolForItem(heldItem);
-	const setItemCount = useInventoryStore((s) => s.setItemCount);
 	const setInventoryOpen = useInventoryStore((s) => s.setInventoryOpen);
+	const inventoryHydrated = useInventoryStore((s) => s.inventoryHydrated);
 	const pushNotice = useNotificationStore((s) => s.push);
 	const paused = usePauseStore((s) => s.paused);
 	const setPaused = usePauseStore((s) => s.setPaused);
@@ -103,40 +104,16 @@ export default function FarmMap() {
 		sceneRef.current?.noteHotbarSwap();
 	}, [selectedHotbar]);
 
-	useEffect(() => {
-		if (heldItem === "fence") pushNotice("Hold left mouse to preview a fence; release on green to place.", "system");
-		if (heldItem === "gate") pushNotice("Gate: click clear grass to place. Press E nearby to open or close.", "system");
-		if (heldItem === "shovel") pushNotice("Shovel: click a fence or farm object to dig it up.", "system");
-		if (heldItem && MOVABLE_PROP_ASSETS.some((asset) => asset === heldItem))
-			pushNotice(`Hold left mouse to preview ${heldItem}; release on green to place.`, "system");
-	}, [heldItem, pushNotice]);
+	useFarmItemNotices(heldItem);
 
-	const fenceCount = farm?.fence_count;
-	useEffect(() => {
-		if (fenceCount !== undefined && isOwner) setItemCount("fence", fenceCount);
-	}, [fenceCount, isOwner, setItemCount]);
-
-	const gateCount = farm?.gate_count;
-	useEffect(() => {
-		if (gateCount !== undefined && isOwner) setItemCount("gate", gateCount);
-	}, [gateCount, isOwner, setItemCount]);
-
-	const propInventory = farm?.prop_inventory;
-	useEffect(() => {
-		if (!propInventory || !isOwner) return;
-		for (const asset of MOVABLE_PROP_ASSETS)
-			setItemCount(asset, propInventory[asset] ?? 0);
-	}, [propInventory, isOwner, setItemCount]);
-
-	const ownedAnimals = farm?.animals;
-	useEffect(() => {
-		if (!ownedAnimals || !isOwner) return;
-		for (const pen of livestockPens)
-			setItemCount(pen.id, ownedAnimals[pen.id] ?? 0);
-	}, [ownedAnimals, isOwner, setItemCount]);
+	useFarmObjectInventory(farm, isOwner);
 
 	// Keep the local inventory's produce in sync with the authoritative barn.
 	useBarnReconcile(farm?.barn ?? null, isOwner);
+
+	// Persist the signed-in account's layout after any local inventory change.
+	// The visited farm may belong to someone else; the save is scoped by session.
+	useInventoryPersistence(inventoryHydrated, username);
 
 	const [area, setArea] = useState<WorldArea>("Farm");
 	const [travelPrompt, setTravelPrompt] = useState<string | null>(null);
@@ -144,6 +121,7 @@ export default function FarmMap() {
 	const [bankDesk, setBankDesk] = useState<BankDesk | null>(null);
 	const livestock = useLivestockPurchase(isOwner, username);
 	const { select: selectAnimal, setMessage: setLivestockMessage } = livestock;
+	const [fishingOpen, setFishingOpen] = useState(false);
 	const [engineReady, setEngineReady] = useState(false);
 
 	useEffect(() => {
@@ -162,7 +140,16 @@ export default function FarmMap() {
 			backgroundColor: ex.Color.fromHex("#79a44d"),
 		});
 
-		const scene = new FarmMapScene(target, isOwner, setTravelPrompt, setArea);
+		const scene = new FarmMapScene(
+			target,
+			isOwner,
+			setTravelPrompt,
+			setArea,
+			() => {
+				scene.setOverlayPaused(true);
+				setFishingOpen(true);
+			},
+		);
 		scene.onFarmUpdate = (snapshot) => {
 			if (cancelled) return;
 			setHud(snapshot);
@@ -243,6 +230,7 @@ export default function FarmMap() {
 		return () => {
 			setPaused(false);
 			setInventoryOpen(false);
+			setFishingOpen(false);
 		};
 	}, [setPaused, setInventoryOpen]);
 
@@ -268,9 +256,15 @@ export default function FarmMap() {
 		setBankDesk(null);
 	}
 
+	function closeFishing() {
+		sceneRef.current?.setOverlayPaused(false);
+		setFishingOpen(false);
+	}
+
 	// The farm channel join is what sets `farm`; until it lands, an action would
 	// be dropped by emitFarmAction, so the world isn't interactive yet.
-	const worldReady = engineReady && farm !== null;
+	const worldReady =
+		engineReady && farm !== null && (!isOwner || inventoryHydrated);
 
 	return (
 		<main
@@ -317,10 +311,13 @@ export default function FarmMap() {
 					</p>
 				</div>
 			)}
-			<Hud tiles={farm?.tiles.length ?? 0} hovered={hud.hovered} />
+			{(!isOwner || inventoryHydrated) && (
+				<Hud tiles={farm?.tiles.length ?? 0} hovered={hud.hovered} />
+			)}
 			<ComboCounter />
 			<InventoryPanel />
 			{paused && <PauseMenu />}
+			{fishingOpen && <FishingOverlay onClose={closeFishing} />}
 			<CasinoOverlays open={casinoOverlay} onClose={closeCasinoOverlay} />
 		</main>
 	);

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { register, resetServer, uniqueName, waitForTrainStop, walkUntilPrompt } from "./helpers";
+import { register, resetServer, uniqueName, waitForTrainStop, waitForWorld, walkUntilPrompt } from "./helpers";
 
 test("enter the livestock market and buy a pig from its pen", async ({ page }) => {
 	await resetServer();
@@ -33,6 +33,7 @@ test("enter the livestock market and buy a pig from its pen", async ({ page }) =
 	await expect(page.getByTestId("livestock-owned")).toHaveText("1");
 
 	await page.reload();
+	await waitForWorld(page);
 	await expect(page.getByTestId("farm-balance")).toContainText("45");
 	await page.getByTestId("open-inventory").click();
 	await expect(page.getByTestId("inventory-panel").locator('[data-item="pig"]')).toHaveCount(1);

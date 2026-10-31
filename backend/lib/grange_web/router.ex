@@ -28,6 +28,10 @@ defmodule GrangeWeb.Router do
     post("/bank/transfer", BankController, :transfer)
     post("/land/buy", BankController, :buy_land)
 
+    get("/inventory", InventoryController, :index)
+    put("/inventory", InventoryController, :replace)
+    post("/inventory/buy", InventoryController, :buy)
+
     get("/state", HealthController, :state)
 
     # Test hook: lets e2e runs start from a clean slate. Compiled out of
