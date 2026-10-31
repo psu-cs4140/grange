@@ -212,7 +212,7 @@ test("a carried house previews during drag and can return to its original spot",
 	await expect(houseSlot).toHaveCount(0);
 });
 
-test("a carried sign can be dropped directly on the road path", async ({ page }) => {
+test("a carried sign can be dropped on open grass", async ({ page }) => {
 	await resetServer();
 	await register(page, uniqueName("Roadsign"));
 	await page.keyboard.press("7");
@@ -220,8 +220,8 @@ test("a carried sign can be dropped directly on the road path", async ({ page })
 	const signSlot = page.locator('[data-item="sign"]');
 	await expect(signSlot).toHaveCount(1);
 	await signSlot.click();
-	const road = await worldPoint(page, 600, 288);
-	await page.mouse.move(road.x, road.y);
+	const openGrass = await worldPoint(page, 600, 288);
+	await page.mouse.move(openGrass.x, openGrass.y);
 	await page.mouse.down();
 	await expect(signSlot).toHaveCount(1);
 	await page.mouse.up();

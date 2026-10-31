@@ -18,6 +18,7 @@ function farmWithTile(state: ActiveFarm["tiles"][number]["state"]): ActiveFarm {
 		tiles: [{ x: 0, y: 0, state, crop: state === "tilled" ? undefined : "tomato" }],
 		tomatoes: 0,
 		barn: {},
+		animals: {},
 		fences: [],
 		fence_count: 0,
 		gates: [],

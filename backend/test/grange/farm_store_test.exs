@@ -2,11 +2,21 @@ defmodule Grange.FarmStoreTest do
   @moduledoc false
   use ExUnit.Case, async: false
 
-  alias Grange.{Farm, FarmGateActions, FarmStore}
+  alias Grange.{Farm, FarmGateActions, FarmRecord, FarmStore, Repo}
 
   setup do
     FarmStore.reset()
     :ok
+  end
+
+  defp full_farm(owner) do
+    FarmStore.ensure(owner)
+
+    Repo.get!(FarmRecord, owner)
+    |> Ecto.Changeset.change(land_level: 4)
+    |> Repo.update!()
+
+    FarmStore.view(owner)
   end
 
   defp tile_at(owner, x, y) do
@@ -23,7 +33,7 @@ defmodule Grange.FarmStoreTest do
   test "ensure/1 creates a farm once" do
     refute FarmStore.has_farm?("Alice")
 
-    view = FarmStore.ensure("Alice")
+    view = full_farm("Alice")
     assert view.owner == "Alice"
     assert view.tiles == []
     assert view.barn == %{}
@@ -33,12 +43,12 @@ defmodule Grange.FarmStoreTest do
     assert view.gates == []
     assert view.gate_count == 2
     assert FarmStore.has_farm?("Alice")
-    assert FarmStore.ensure("Alice") == view
+    assert full_farm("Alice") == view
   end
 
   test "fences persist per farm, connect as coordinates, and shovel returns stock" do
-    FarmStore.ensure("Alice")
-    FarmStore.ensure("Bob")
+    full_farm("Alice")
+    full_farm("Bob")
 
     assert {:ok, view} = FarmStore.action("Alice", %{"kind" => "place_fence", "x" => 7, "y" => 5})
     assert view.fences == [%{x: 7, y: 5}]
@@ -59,8 +69,8 @@ defmodule Grange.FarmStoreTest do
   end
 
   test "gates persist, consume a separate supply, toggle, and reorient" do
-    FarmStore.ensure("Alice")
-    FarmStore.ensure("Bob")
+    full_farm("Alice")
+    full_farm("Bob")
 
     assert {:ok, view} = FarmStore.action("Alice", %{"kind" => "place_gate", "x" => 7, "y" => 5})
     assert view.gates == [%{x: 7, y: 5, direction: "horizontal", open: false}]
@@ -98,7 +108,7 @@ defmodule Grange.FarmStoreTest do
   end
 
   test "a gate cannot share a tile with a fence" do
-    FarmStore.ensure("Alice")
+    full_farm("Alice")
     FarmStore.action("Alice", %{"kind" => "place_fence", "x" => 4, "y" => 4})
 
     assert {:error, "fence already here"} =
@@ -106,7 +116,7 @@ defmodule Grange.FarmStoreTest do
   end
 
   test "fences reject water and occupied crop tiles" do
-    FarmStore.ensure("Alice")
+    full_farm("Alice")
 
     assert {:error, "out of bounds"} =
              FarmStore.action("Alice", %{"kind" => "place_fence", "x" => 7, "y" => 10})
@@ -118,8 +128,8 @@ defmodule Grange.FarmStoreTest do
   end
 
   test "well and sign can be dug up, carried, placed, and reloaded per farm" do
-    FarmStore.ensure("Alice")
-    FarmStore.ensure("Bob")
+    full_farm("Alice")
+    full_farm("Bob")
     assert {:ok, view} = FarmStore.prop_action("Alice", %{"kind" => "dig", "index" => 2})
     assert view.prop_inventory == %{"well" => 1}
     assert [%{index: 2, carried: true}] = view.prop_overrides
@@ -148,7 +158,7 @@ defmodule Grange.FarmStoreTest do
   end
 
   test "train stays fixed and placement requires a carried item and valid grid" do
-    FarmStore.ensure("Alice")
+    full_farm("Alice")
 
     assert {:error, "that object cannot be dug up"} =
              FarmStore.prop_action("Alice", %{"kind" => "dig", "index" => 12})
@@ -186,12 +196,12 @@ defmodule Grange.FarmStoreTest do
                "kind" => "place",
                "asset" => "well",
                "x" => 480,
-               "y" => -2
+               "y" => -300
              })
   end
 
   test "farmhouse and barn may be picked up while train remains placed" do
-    FarmStore.ensure("Alice")
+    full_farm("Alice")
     assert {:ok, _} = FarmStore.prop_action("Alice", %{"kind" => "dig", "index" => 0})
     assert {:ok, view} = FarmStore.prop_action("Alice", %{"kind" => "dig", "index" => 1})
     assert view.prop_inventory == %{"farmhouse" => 1, "barn" => 1}
@@ -202,7 +212,7 @@ defmodule Grange.FarmStoreTest do
   end
 
   test "a dug-up farmhouse can return to its original position beside the path" do
-    FarmStore.ensure("Alice")
+    full_farm("Alice")
     assert {:ok, _} = FarmStore.prop_action("Alice", %{"kind" => "dig", "index" => 0})
 
     assert {:ok, view} =
@@ -218,7 +228,7 @@ defmodule Grange.FarmStoreTest do
   end
 
   test "tilling creates a tile and rejects a double till" do
-    FarmStore.ensure("Alice")
+    full_farm("Alice")
 
     assert {:ok, _view} = FarmStore.action("Alice", %{"kind" => "till", "x" => 2, "y" => 3})
     assert %{state: :tilled} = tile_at("Alice", 2, 3)
@@ -228,7 +238,7 @@ defmodule Grange.FarmStoreTest do
   end
 
   test "plant and water follow the tile lifecycle" do
-    FarmStore.ensure("Alice")
+    full_farm("Alice")
 
     assert {:error, "no tilled tile here"} =
              FarmStore.action("Alice", %{"kind" => "plant", "x" => 0, "y" => 0})
@@ -242,7 +252,7 @@ defmodule Grange.FarmStoreTest do
   end
 
   test "watering rejects untilled and already-watered tiles; unknown kinds are invalid" do
-    FarmStore.ensure("Alice")
+    full_farm("Alice")
     FarmStore.action("Alice", %{"kind" => "till", "x" => 1, "y" => 1})
 
     assert {:error, "tile is not planted"} =
@@ -259,7 +269,7 @@ defmodule Grange.FarmStoreTest do
   end
 
   test "harvesting banks produce in the barn and tomatoes regrow once" do
-    FarmStore.ensure("Alice")
+    full_farm("Alice")
     FarmStore.action("Alice", %{"kind" => "till", "x" => 5, "y" => 5})
     FarmStore.action("Alice", %{"kind" => "plant", "x" => 5, "y" => 5})
     grow("Alice", 5, 5)
@@ -273,7 +283,7 @@ defmodule Grange.FarmStoreTest do
   end
 
   test "harvesting an immature crop is rejected and does not water it" do
-    FarmStore.ensure("Alice")
+    full_farm("Alice")
     FarmStore.action("Alice", %{"kind" => "till", "x" => 4, "y" => 4})
     FarmStore.action("Alice", %{"kind" => "plant", "x" => 4, "y" => 4})
     assert %{state: :planted} = tile_at("Alice", 4, 4)
@@ -291,7 +301,7 @@ defmodule Grange.FarmStoreTest do
   end
 
   test "wheat cannot be harvested by hand and banks its own barn item" do
-    FarmStore.ensure("Alice")
+    full_farm("Alice")
     FarmStore.action("Alice", %{"kind" => "till", "x" => 2, "y" => 2})
     FarmStore.action("Alice", %{"kind" => "plant", "x" => 2, "y" => 2, "crop" => "wheat"})
     grow("Alice", 2, 2)
@@ -315,7 +325,7 @@ defmodule Grange.FarmStoreTest do
   end
 
   test "selling produce removes it from the barn" do
-    FarmStore.ensure("Alice")
+    full_farm("Alice")
     FarmStore.action("Alice", %{"kind" => "till", "x" => 0, "y" => 0})
     FarmStore.action("Alice", %{"kind" => "plant", "x" => 0, "y" => 0})
     grow("Alice", 0, 0)
@@ -326,27 +336,27 @@ defmodule Grange.FarmStoreTest do
   end
 
   test "selling more than the barn holds is rejected" do
-    FarmStore.ensure("Alice")
+    full_farm("Alice")
 
     assert {:error, "not enough tomato"} = FarmStore.sell("Alice", "tomato", 1)
   end
 
   test "selling a non-positive amount is rejected" do
-    FarmStore.ensure("Alice")
+    full_farm("Alice")
 
     assert {:error, "invalid sale"} = FarmStore.sell("Alice", "tomato", 0)
     assert {:error, "invalid sale"} = FarmStore.sell("Alice", "tomato", -2)
   end
 
   test "actions outside the grid are rejected" do
-    FarmStore.ensure("Alice")
+    full_farm("Alice")
 
     assert {:error, "out of bounds"} =
              FarmStore.action("Alice", %{"kind" => "till", "x" => 99, "y" => 0})
   end
 
   test "summaries report tile counts and produce" do
-    FarmStore.ensure("Alice")
+    full_farm("Alice")
     FarmStore.action("Alice", %{"kind" => "till", "x" => 0, "y" => 0})
     FarmStore.action("Alice", %{"kind" => "plant", "x" => 0, "y" => 0})
 
@@ -355,7 +365,7 @@ defmodule Grange.FarmStoreTest do
 
   test "tick broadcasts a single lobby summary no matter how many farms change" do
     for owner <- ["Alice", "Bob", "Carol"] do
-      FarmStore.ensure(owner)
+      full_farm(owner)
       FarmStore.action(owner, %{"kind" => "till", "x" => 0, "y" => 0})
       FarmStore.action(owner, %{"kind" => "plant", "x" => 0, "y" => 0})
       FarmStore.action(owner, %{"kind" => "water", "x" => 0, "y" => 0})
