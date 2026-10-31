@@ -1,5 +1,6 @@
 import { expect, type Page } from "@playwright/test";
-import { MAP_COLUMNS, MAP_ROWS } from "../src/world/mapData";
+import { MAX_INTERACTION_DISTANCE } from "../src/world/interaction";
+import { MAP_COLUMNS, MAP_ROWS, TILE_SIZE } from "../src/world/mapData";
 
 export const BASE = process.env.E2E_BASE_URL ?? "http://localhost:3201";
 
@@ -111,6 +112,33 @@ export async function walkUntilPrompt(
 	}
 }
 
+/**
+ * Taps a movement key in short bursts until the travel prompt contains `text`.
+ * A continuous hold can coast well past a narrow interaction radius on a slow
+ * runner before the assertion notices; short bursts bound that overshoot so
+ * the player stops inside the radius instead of through it.
+ */
+export async function stepUntilPrompt(
+	page: Page,
+	key: string,
+	text: string,
+	{ step = 70, timeout = 20_000 } = {},
+): Promise<void> {
+	const prompt = page.getByTestId("travel-prompt");
+	const deadline = Date.now() + timeout;
+	for (;;) {
+		await page.keyboard.down(key);
+		await page.waitForTimeout(step);
+		await page.keyboard.up(key);
+		if (await prompt.isVisible()) {
+			const shown = (await prompt.textContent()) ?? "";
+			if (shown.includes(text)) return;
+		}
+		if (Date.now() > deadline)
+			throw new Error(`Prompt "${text}" did not appear while tapping ${key}`);
+	}
+}
+
 /** Waits for the arriving train to park so the player can move again. The
  * marketplace spawn sits beside the train, so its prompt appears once idle. */
 export async function waitForTrainStop(page: Page): Promise<void> {
@@ -185,8 +213,92 @@ export async function hoverFarmTile(
 	await page.mouse.move(x, y);
 }
 
-/** Clicks the center of a farm map tile. */
+/**
+ * Walks the player until it stands within `tolerance` px of a world point.
+ * Tools only reach `MAX_INTERACTION_DISTANCE` now, so click-driven farm tests
+ * must stand beside their target first. The player's world position is
+ * published by the scene as data attributes on the farm page, so the helper
+ * polls the real position rather than guessing key-hold durations. It gives up
+ * on a stalled walk only once the player is within `reach` px of the target, so
+ * a caller whose real target sits one square beyond the walk point can demand a
+ * tighter margin before the walk is abandoned.
+ */
+export async function movePlayerNear(
+	page: Page,
+	worldX: number,
+	worldY: number,
+	tolerance = 40,
+	{ reach = MAX_INTERACTION_DISTANCE, timeout = 20_000 } = {},
+): Promise<void> {
+	const world = page.locator(".farm-map-page");
+	const deadline = Date.now() + timeout;
+	let previous = Number.POSITIVE_INFINITY;
+	let stalled = 0;
+	let held: string[] = [];
+	try {
+		for (;;) {
+			const x = Number(await world.getAttribute("data-player-x"));
+			const y = Number(await world.getAttribute("data-player-y"));
+			const dx = worldX - x;
+			const dy = worldY - y;
+			const distance = Math.hypot(dx, dy);
+			if (distance <= tolerance) return;
+			if (distance >= previous - 1) stalled += 1;
+			else stalled = 0;
+			previous = distance;
+			// A slow runner can lag the game loop behind the DOM poll and look
+			// stalled; only bail out after a long pause and only when the point
+			// the caller will actually act on is already reachable.
+			if (stalled > 20 && distance <= reach) return;
+			if (Date.now() > deadline) return;
+			const keys: string[] = [];
+			if (Math.abs(dx) > tolerance * 0.5) keys.push(dx > 0 ? "d" : "a");
+			if (Math.abs(dy) > tolerance * 0.5) keys.push(dy > 0 ? "s" : "w");
+			if (keys.length === 0) return;
+			// Turning is progress: a new direction should not inherit the stalled
+			// count from the old one.
+			if (keys.join() !== held.join()) stalled = 0;
+			// Keep moving continuously; only change the keys that differ. Polling
+			// instead of bursting keeps the walk fast enough on slow runners.
+			for (const key of held) if (!keys.includes(key)) await page.keyboard.up(key);
+			for (const key of keys) if (!held.includes(key)) await page.keyboard.down(key);
+			held = keys;
+			await page.waitForTimeout(50);
+		}
+	} finally {
+		for (const key of held) await page.keyboard.up(key);
+	}
+}
+
+/** Clicks the center of a farm map tile, walking the player into reach first. */
 export async function clickFarmTile(
+	page: Page,
+	column: number,
+	row: number,
+): Promise<void> {
+	const { x, y } = await farmTilePosition(page, column, row);
+	// Stand on the neighbouring tile rather than on the target: placement rules
+	// refuse the player's own tile, and standing beside it keeps the farmer
+	// sprite from covering the tile's pixels. One tile away is still within
+	// MAX_INTERACTION_DISTANCE.
+	const beside = column > 0 ? column - 1 : column + 1;
+	await movePlayerNear(
+		page,
+		(beside + 0.5) * TILE_SIZE,
+		(row + 0.5) * TILE_SIZE,
+		12,
+		// The click lands on a tile one square past the walk point, so once the
+		// walk is abandoned the player must be close enough that the *clicked*
+		// tile is inside reach, not merely the walk point.
+		{ reach: MAX_INTERACTION_DISTANCE - TILE_SIZE - 8 },
+	);
+	await page.mouse.click(x, y);
+}
+
+/** Clicks a farm tile without moving the player. Prop placement is not
+ * reach-gated, and walking into the tile would trip the "move out of the
+ * placement area" rule, so placement tests click from where they stand. */
+export async function tapFarmTile(
 	page: Page,
 	column: number,
 	row: number,
