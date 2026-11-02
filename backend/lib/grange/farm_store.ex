@@ -33,6 +33,7 @@ defmodule Grange.FarmStore do
     Inventory,
     InventoryItem,
     InventorySlot,
+    Land,
     PlayerItem,
     Repo,
     Tile
@@ -53,7 +54,6 @@ defmodule Grange.FarmStore do
     view(owner)
   end
 
-  @spec has_farm?(String.t()) :: boolean()
   def has_farm?(owner), do: Repo.exists?(from(f in FarmRecord, where: f.owner == ^owner))
 
   @spec view(String.t()) :: map() | nil
@@ -74,6 +74,8 @@ defmodule Grange.FarmStore do
           fence_count: farm.fence_count,
           gates: FarmGates.list(owner),
           gate_count: farm.gate_count,
+          animals: farm.animals,
+          land_level: farm.land_level,
           prop_overrides: FarmProps.overrides(owner),
           prop_inventory: FarmProps.inventory(owner),
           storage: BarnStorage.inventory(farm)
@@ -150,16 +152,8 @@ defmodule Grange.FarmStore do
   end
 
   defp run(owner, kind, x, y, opts) do
-    bounds? =
-      if kind in [:place_fence, :remove_fence, :place_gate, :remove_gate],
-        do: x in 0..17 and y in 0..9,
-        else: Farm.in_bounds?(x, y)
-
-    if bounds? do
-      apply_action(owner, kind, x, y, opts)
-    else
-      {:error, "out of bounds"}
-    end
+    with :ok <- Land.check(owner, kind, x, y, true),
+         do: apply_action(owner, kind, x, y, opts)
   end
 
   defp apply_action(owner, kind, x, y, opts) do
