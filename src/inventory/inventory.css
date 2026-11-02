@@ -437,32 +437,6 @@ button.hud-prompt:focus-visible {
 	color: #9a8b72;
 }
 
-.barn-slot-wrap {
-	position: relative;
-}
-
-.barn-store {
-	position: absolute;
-	right: -0.2rem;
-	bottom: -0.45rem;
-	padding: 0.15rem 0.3rem;
-	border: 1px solid rgba(240, 192, 64, 0.6);
-	border-radius: 0.25rem;
-	background: rgba(38, 28, 20, 0.95);
-	color: #f0c040;
-	font-size: 0.55rem;
-	line-height: 1;
-	text-transform: uppercase;
-	letter-spacing: 0.06em;
-	cursor: pointer;
-	z-index: 1;
-}
-
-.barn-store:hover {
-	background: rgba(240, 192, 64, 0.2);
-	color: #ffe680;
-}
-
 .barn-hint {
 	padding: 0 1rem;
 }

@@ -43,9 +43,11 @@ test("the barn stores a stack and returns it to the inventory", async ({
 	await resetServer();
 	await register(page, uniqueName("Storer"));
 
+	// Select the seed-bag stack (hotbar slot 2) before opening the barn.
+	await page.keyboard.press("2");
 	await openBarn(page);
-	// The opening hotbar holds 10 seeds; the slot's Store button moves them.
-	await page.getByTestId("barn-store-hotbar-1").click();
+	// Shift+E quick-moves the selected hotbar stack into storage.
+	await page.keyboard.press("Shift+E");
 	await expect(page.getByTestId("barn-slot-0")).toHaveAttribute(
 		"data-item",
 		"seed-bag",
@@ -55,14 +57,21 @@ test("the barn stores a stack and returns it to the inventory", async ({
 		"10",
 	);
 	await expect(page.getByTestId("barn-message")).toContainText("Stored 10");
-	// The stored stack left the player slot, so its Store button is gone.
-	await expect(page.getByTestId("barn-store-hotbar-1")).toHaveCount(0);
+	// The stored stack left the player's hotbar slot.
+	const barnHotbar = page.getByTestId("barn-player-hotbar");
+	await expect(barnHotbar.getByTestId("slot-hotbar-1")).toHaveAttribute(
+		"data-item",
+		"",
+	);
 
 	// Clicking a storage slot takes the stack back into the inventory.
 	await page.getByTestId("barn-slot-0").click();
 	await expect(page.getByTestId("barn-slot-0")).toHaveAttribute("data-item", "");
 	await expect(page.getByTestId("barn-message")).toContainText("Took 10");
-	await expect(page.getByTestId("barn-store-hotbar-1")).toBeVisible();
+	await expect(barnHotbar.getByTestId("slot-hotbar-1")).toHaveAttribute(
+		"data-item",
+		"seed-bag",
+	);
 
 	// Escape closes the window.
 	await page.keyboard.press("Escape");
@@ -87,8 +96,9 @@ test("barn storage survives a reload", async ({ page }) => {
 	await resetServer();
 	await register(page, uniqueName("Keeper"));
 
+	await page.keyboard.press("2");
 	await openBarn(page);
-	await page.getByTestId("barn-store-hotbar-1").click();
+	await page.keyboard.press("Shift+E");
 	await expect(page.getByTestId("barn-slot-0")).toHaveAttribute(
 		"data-item",
 		"seed-bag",
