@@ -11,7 +11,7 @@ import { FenceLayer } from "./fenceRendering";
 import { FencePlacementPreview } from "./FencePlacementPreview";
 import { actOnFence, selectedFarmItem } from "./fenceActions";
 import { performFarmAction } from "./farmActionRunner";
-import { handleFarmPropClick, placeFarmProp } from "./farmPropActions";
+import { canRearrangeProps, handleFarmPropClick, placeFarmProp } from "./farmPropActions";
 import { FarmBarn } from "./FarmBarn";
 import { FarmPropLayer } from "./farmPropLayer";
 import { FarmPlacementPreview } from "./FarmPlacementPreview";
@@ -122,7 +122,7 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 			const item = selectedFarmItem();
 			if (this.barn.handleClick(evt.worldPos, item, this.farmProps)) return;
 			const farm = useGameStore.getState().activeFarm;
-			if (item && isMovablePropAsset(item) && this.isOwner && farm) {
+			if (item && isMovablePropAsset(item) && canRearrangeProps(this.isOwner) && farm) {
 				if ((farm.prop_inventory[item] ?? 0) > 0)
 					this.placement.start(item, evt.worldPos, this.player.pos, farm);
 				else this.report(`No ${item} in inventory.`);
@@ -275,10 +275,9 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 		if (this.strokeTiles.has(strokeKey)) return;
 		this.strokeTiles.add(strokeKey);
 
-		if (!this.isOwner) { this.report("Visitors can't farm here."); return; }
-
 		const item = selectedFarmItem();
 		if (
+			canRearrangeProps(this.isOwner) &&
 			handleFarmPropClick(
 				item,
 				worldPos,
@@ -289,6 +288,8 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 			)
 		)
 			return;
+
+		if (!this.isOwner) { this.report("Visitors can't farm here."); return; }
 
 		if (item === "gate" || item === "shovel") {
 			actOnFence(this.owner, column, row, item, this.blocks, this.player.pos, (message) =>

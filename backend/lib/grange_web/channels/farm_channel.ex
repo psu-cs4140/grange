@@ -49,7 +49,7 @@ defmodule GrangeWeb.FarmChannel do
 
   @impl true
   def handle_in("farmPropAction", %{"action" => action}, socket) do
-    authorize(socket, fn owner -> prop_act(socket, owner, action) end)
+    authorize_prop(socket, fn owner -> prop_act(socket, owner, action) end)
   end
 
   @impl true
@@ -71,6 +71,18 @@ defmodule GrangeWeb.FarmChannel do
       is_nil(user) -> {:reply, {:error, %{error: "not logged in"}}, socket}
       user.username != owner -> {:reply, {:error, %{error: "not your farm"}}, socket}
       true -> handler.(owner)
+    end
+  end
+
+  # Props are normally owner-only, but admins may rearrange any farm.
+  defp authorize_prop(socket, handler) do
+    owner = socket.assigns[:owner]
+    user = socket.assigns[:user]
+
+    cond do
+      is_nil(user) -> {:reply, {:error, %{error: "not logged in"}}, socket}
+      user.username == owner or user.is_admin -> handler.(owner)
+      true -> {:reply, {:error, %{error: "not your farm"}}, socket}
     end
   end
 

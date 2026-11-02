@@ -107,6 +107,35 @@ defmodule GrangeWeb.FarmChannelTest do
     assert reply.error == "not your farm"
   end
 
+  test "an admin can rearrange another player's props" do
+    full_farm("Alice")
+
+    admin =
+      Helper.register_user("Root")
+      |> Ecto.Changeset.change(is_admin: true)
+      |> Repo.update!()
+
+    {:ok, _reply, socket} =
+      socket(GrangeWeb.UserSocket, admin.id, %{user: admin})
+      |> subscribe_and_join(GrangeWeb.FarmChannel, "farm:Alice")
+
+    ref = push(socket, "farmPropAction", %{"action" => %{"kind" => "dig", "index" => 2}})
+    assert_reply(ref, :ok)
+    assert_broadcast("farmUpdate", %{farm: %{prop_overrides: overrides}})
+    assert Enum.any?(overrides, &(&1.index == 2 and &1.carried))
+  end
+
+  test "a non-admin visitor cannot move props" do
+    full_farm("Alice")
+
+    {:ok, _reply, socket} =
+      signed_socket("Bob") |> subscribe_and_join(GrangeWeb.FarmChannel, "farm:Alice")
+
+    ref = push(socket, "farmPropAction", %{"action" => %{"kind" => "dig", "index" => 2}})
+    assert_reply(ref, :error, reply)
+    assert reply.error == "not your farm"
+  end
+
   test "the owner can sell produce and the change is broadcast" do
     full_farm("Alice")
     FarmStore.action("Alice", %{"kind" => "till", "x" => 1, "y" => 1})
