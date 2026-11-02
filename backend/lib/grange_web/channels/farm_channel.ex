@@ -8,7 +8,7 @@ defmodule GrangeWeb.FarmChannel do
 
   use Phoenix.Channel
 
-  alias Grange.{FarmGateActions, FarmStore, Inventory}
+  alias Grange.{BarnStorage, FarmGateActions, FarmStore, Inventory}
 
   @impl true
   def join("farm:" <> owner, _payload, socket) do
@@ -49,7 +49,12 @@ defmodule GrangeWeb.FarmChannel do
 
   @impl true
   def handle_in("farmPropAction", %{"action" => action}, socket) do
-    authorize(socket, fn owner -> prop_act(socket, owner, action) end)
+    authorize_prop(socket, fn owner -> prop_act(socket, owner, action) end)
+  end
+
+  @impl true
+  def handle_in("barnAction", %{"action" => action}, socket) do
+    authorize(socket, fn owner -> barn_act(socket, owner, action) end)
   end
 
   @impl true
@@ -66,6 +71,18 @@ defmodule GrangeWeb.FarmChannel do
       is_nil(user) -> {:reply, {:error, %{error: "not logged in"}}, socket}
       user.username != owner -> {:reply, {:error, %{error: "not your farm"}}, socket}
       true -> handler.(owner)
+    end
+  end
+
+  # Props are normally owner-only, but admins may rearrange any farm.
+  defp authorize_prop(socket, handler) do
+    owner = socket.assigns[:owner]
+    user = socket.assigns[:user]
+
+    cond do
+      is_nil(user) -> {:reply, {:error, %{error: "not logged in"}}, socket}
+      user.username == owner or user.is_admin -> handler.(owner)
+      true -> {:reply, {:error, %{error: "not your farm"}}, socket}
     end
   end
 
@@ -98,6 +115,15 @@ defmodule GrangeWeb.FarmChannel do
   defp sell(socket, owner, item, count) do
     case FarmStore.sell(owner, item, count) do
       {:ok, _farm} -> {:reply, :ok, socket}
+      {:error, reason} -> {:reply, {:error, %{error: reason}}, socket}
+    end
+  end
+
+  defp barn_act(socket, owner, action) do
+    with {:ok, :ok} <- BarnStorage.action(owner, action),
+         {:ok, _farm} <- FarmStore.refresh(owner) do
+      {:reply, :ok, socket}
+    else
       {:error, reason} -> {:reply, {:error, %{error: reason}}, socket}
     end
   end
