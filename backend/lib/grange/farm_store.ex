@@ -17,6 +17,7 @@ defmodule Grange.FarmStore do
   alias Grange.{
     Barn,
     BarnItem,
+    BarnStorage,
     Crops,
     Farm,
     FarmAction,
@@ -76,7 +77,8 @@ defmodule Grange.FarmStore do
           animals: farm.animals,
           land_level: farm.land_level,
           prop_overrides: FarmProps.overrides(owner),
-          prop_inventory: FarmProps.inventory(owner)
+          prop_inventory: FarmProps.inventory(owner),
+          storage: BarnStorage.inventory(farm)
         }
     end
   end
@@ -349,9 +351,8 @@ defmodule Grange.FarmStore do
     broadcast_lobby()
   end
 
-  defp broadcast_farm(owner) do
-    GrangeWeb.Endpoint.broadcast("farm:" <> owner, "farmUpdate", %{farm: view(owner)})
-  end
+  defp broadcast_farm(owner),
+    do: GrangeWeb.Endpoint.broadcast("farm:" <> owner, "farmUpdate", %{farm: view(owner)})
 
   defp broadcast_lobby do
     GrangeWeb.Endpoint.broadcast(@lobby_topic, "farms", %{farms: summaries()})
