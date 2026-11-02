@@ -164,4 +164,24 @@ defmodule Grange.AccountsTest do
     assert {:ok, _} = Accounts.authenticate("Alice", "brand-new-pass")
     assert {:error, _} = Accounts.authenticate("Alice", "harvest-please")
   end
+
+  test "ensure_admin creates the default admin account idempotently" do
+    assert {:ok, admin} = Accounts.ensure_admin()
+    assert admin.username == "admin"
+    assert admin.is_admin
+
+    assert {:ok, again} = Accounts.ensure_admin()
+    assert again.id == admin.id
+  end
+
+  test "ensure_admin promotes an existing account that owns the username" do
+    assert {:ok, user} =
+             register(%{"username" => "admin", "email" => "owner@example.test"})
+
+    refute user.is_admin
+
+    assert {:ok, admin} = Accounts.ensure_admin()
+    assert admin.id == user.id
+    assert admin.is_admin
+  end
 end

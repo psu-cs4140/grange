@@ -22,6 +22,12 @@ defmodule Grange.Accounts do
   # any in-game price; debits against it are ignored (see apply_balance_delta/2).
   @admin_balance 1_000_000_000
 
+  # The built-in admin login. `ensure_admin/0` keeps it available without the
+  # operator having to run `mix grange.create_admin` first.
+  @admin_username "admin"
+  @admin_email "admin@grange.test"
+  @admin_password "grange-admin"
+
   @spec register(map()) :: {:ok, User.t()} | {:error, String.t()}
   def register(attrs) do
     username = attrs |> fetch(:username) |> String.trim()
@@ -136,6 +142,29 @@ defmodule Grange.Accounts do
     case Repo.get_by(User, username: username) do
       nil -> {:error, "unknown user"}
       %User{} = user -> promote(user, password)
+    end
+  end
+
+  @doc """
+  Ensures the built-in admin account exists.
+
+  Called on boot and after a dev reset so the default login is always
+  available. If the default username already exists it is promoted; if only
+  the default email is taken, that account is promoted instead.
+  """
+  @spec ensure_admin() :: {:ok, User.t()} | {:error, String.t()}
+  def ensure_admin do
+    case Repo.get_by(User, username: @admin_username) ||
+           Repo.get_by(User, email: @admin_email) do
+      nil ->
+        register_admin(%{
+          "username" => @admin_username,
+          "email" => @admin_email,
+          "password" => @admin_password
+        })
+
+      %User{} = user ->
+        grant_admin(user.username)
     end
   end
 
