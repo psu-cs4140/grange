@@ -2,11 +2,8 @@ import { useState } from "react";
 import { emitBarnAction } from "../socket";
 import { useGameStore } from "../store";
 import { BARN_ITEM_LIMIT, EMPTY_STORAGE } from "./barnStorage";
-import {
-	freeSpaceFor,
-	useInventoryStore,
-	type SlotRef,
-} from "./inventoryStore";
+import { useInventoryStore, type SlotRef } from "./inventoryStore";
+import { freeSpaceFor } from "./inventorySpace";
 import { getItemDef, type ItemId } from "./items";
 
 export interface BarnStorageControls {

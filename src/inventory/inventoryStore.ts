@@ -333,16 +333,4 @@ export function countItem(
 	return total;
 }
 
-/** How many more of an item the inventory can hold across all slots. */
-export function freeSpaceFor(
-	state: Pick<InventoryState, "grid" | "hotbar">,
-	itemId: ItemId,
-): number {
-	const max = ITEMS[itemId].maxStack;
-	let space = 0;
-	for (const slot of [...state.hotbar, ...state.grid]) {
-		if (!slot.itemId) space += max;
-		else if (slot.itemId === itemId) space += Math.max(0, max - slot.count);
-	}
-	return space;
-}
+
