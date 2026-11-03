@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { register, resetServer, uniqueName, waitForWorld } from "./helpers";
+import { registerFast, uniqueName, waitForWorld } from "./helpers";
 
 /** Where the barn's sprite sits on the farm map (bottom-anchored). */
 const BARN = { x: 935, y: 200 };
@@ -40,8 +40,7 @@ async function walkToBarn(page: Page) {
 test("the barn stores a stack and returns it to the inventory", async ({
 	page,
 }) => {
-	await resetServer();
-	await register(page, uniqueName("Storer"));
+	await registerFast(page, uniqueName("Storer"));
 
 	// Select the seed-bag stack (hotbar slot 2) before opening the barn.
 	await page.keyboard.press("2");
@@ -79,8 +78,7 @@ test("the barn stores a stack and returns it to the inventory", async ({
 });
 
 test("standing at the barn and pressing E opens storage", async ({ page }) => {
-	await resetServer();
-	await register(page, uniqueName("Walker"));
+	await registerFast(page, uniqueName("Walker"));
 
 	await walkToBarn(page);
 	await page.keyboard.press("e");
@@ -93,8 +91,7 @@ test("standing at the barn and pressing E opens storage", async ({ page }) => {
 });
 
 test("barn storage survives a reload", async ({ page }) => {
-	await resetServer();
-	await register(page, uniqueName("Keeper"));
+	await registerFast(page, uniqueName("Keeper"));
 
 	await page.keyboard.press("2");
 	await openBarn(page);
