@@ -18,6 +18,7 @@ const farm: ActiveFarm = {
 	gate_count: 1,
 	prop_overrides: [],
 	prop_inventory: {},
+	storage: {},
 };
 const player = { x: 800, y: 600 };
 

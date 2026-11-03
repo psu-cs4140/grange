@@ -3,6 +3,8 @@ defmodule Grange.Application do
 
   use Application
 
+  require Logger
+
   @impl true
   def start(_type, _args) do
     children =
@@ -18,6 +20,7 @@ defmodule Grange.Application do
 
     with {:ok, supervisor} <- Supervisor.start_link(children, opts) do
       migrate()
+      ensure_admin()
       {:ok, supervisor}
     end
   end
@@ -32,5 +35,14 @@ defmodule Grange.Application do
   defp migrate do
     migrations = Path.join(:code.priv_dir(:grange), "repo/migrations")
     Ecto.Migrator.run(Grange.Repo, migrations, :up, all: true, log: false)
+  end
+
+  # The default admin is baseline data, not something an operator should have
+  # to remember to create before the game is usable.
+  defp ensure_admin do
+    case Grange.Accounts.ensure_admin() do
+      {:ok, _admin} -> :ok
+      {:error, reason} -> Logger.warning("could not ensure the default admin: #{reason}")
+    end
   end
 end

@@ -42,6 +42,30 @@ migrations automatically on boot. Development and test use
 production uses `<release-root>/data/grange.sqlite3` (override with
 `DATABASE_PATH`).
 
+## Admin account
+
+An admin account is handed every item in the game and effectively unlimited
+Grangecoin. The default admin is created automatically on boot (and re-created
+after a dev `/api/reset`), so it is always available:
+
+- username `admin`
+- email `admin@grange.test`
+- password `grange-admin`
+
+Admins are marked by the `is_admin` flag on the account. The SPA grants the
+full item catalog on sign-in, and the wallet ignores spending while `is_admin`
+is set.
+
+To create or promote a different admin, or to reset the default password, use:
+
+```sh
+pnpm admin:create
+pnpm admin:create -- --username root --email root@example.test --password long-enough
+```
+
+Re-running the command on an existing username promotes that account instead of
+creating a new one; pass `--password` to also reset its password.
+
 ## Tests
 
 - `pnpm test:backend` — Elixir unit + channel tests (ExUnit)

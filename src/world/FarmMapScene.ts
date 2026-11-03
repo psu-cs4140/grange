@@ -16,7 +16,8 @@ import { FarmPropLayer } from "./farmPropLayer";
 import { FarmPlacementPreview } from "./FarmPlacementPreview";
 import { FarmTravel } from "./FarmTravel";
 import { FarmFishing } from "./farmFishing";
-import { canEditFarm } from "./farmPermissions";
+import { canEditFarm, canMoveProps } from "./farmPermissions";
+import { FarmBarn } from "./FarmBarn";
 import { FarmScenePresence } from "./farmScenePresence";
 import { FarmToolInput } from "./farmToolInput";
 import { updateFarmerGraphics } from "./farmerSprite";
@@ -63,6 +64,7 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 	private lastWorldPos: ex.Vector | null = null;
 	private deactivated = false;
 	private readonly travel: FarmTravel;
+	private readonly barn: FarmBarn;
 	private readonly fishing: FarmFishing;
 	private readonly onOpenHouse: () => void;
 	private train!: TrainController;
@@ -92,6 +94,7 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 			onAreaChange,
 			onOpenTravel,
 		);
+		this.barn = new FarmBarn(isOwner);
 	}
 
 	override onInitialize(engine: ex.Engine): void {
@@ -130,6 +133,8 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 			placement: this.placement,
 			fencePlacement: this.fencePlacement,
 			canEdit: () => this.canEdit(),
+			canMoveProps: () => this.canMoveFarmProps(),
+			handleBarnClick: (pos, item) => this.barn.handleClick(pos, item, this.farmProps),
 			isDeactivated: () => this.deactivated,
 			report: (message) => this.report(message),
 			reportReadOnly: () => this.reportReadOnly(),
@@ -220,10 +225,13 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 			gate?.prompt ?? null,
 			housePrompt,
 			this.onOpenHouse,
+			this.barn.prompt(this.player, this.farmProps),
 		);
 		if (gate && this.inputManager.consumePress("KeyE", "Enter")) {
 			toggleGate(this.owner, gate.gate, (message) => this.report(message));
 		}
+		// The barn claims E before fishing drains it, but only while in reach.
+		this.barn.update(this.player, this.inputManager, this.farmProps);
 		this.fishing.update(this.player.pos.y, this.inputManager);
 
 		if (this.canEdit()) farmActionOnSpace(this.inputManager, this.player.pos,
@@ -275,6 +283,12 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 
 	private canEdit(): boolean {
 		return canEditFarm(useGameStore.getState().activeFarm, this.isOwner);
+	}
+
+	/** Owners/editor-visitors, plus admins who may rearrange any farm's props. */
+	private canMoveFarmProps(): boolean {
+		const { activeFarm, user } = useGameStore.getState();
+		return canMoveProps(activeFarm, this.isOwner, Boolean(user?.is_admin));
 	}
 
 	private reportReadOnly(): void {

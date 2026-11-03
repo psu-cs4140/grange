@@ -11,3 +11,15 @@ export function canEditFarm(
 ): boolean {
 	return isOwner || Boolean(farm?.visitor_edit);
 }
+
+/**
+ * Moving props follows the same edit gate, except admins may rearrange
+ * buildings on any farm (including farms they are only visiting).
+ */
+export function canMoveProps(
+	farm: Pick<ActiveFarm, "visitor_edit"> | null | undefined,
+	isOwner: boolean,
+	isAdmin: boolean,
+): boolean {
+	return canEditFarm(farm, isOwner) || isAdmin;
+}

@@ -25,6 +25,7 @@ export class FarmTravel {
 		gatePrompt: string | null = null,
 		housePrompt: string | null = null,
 		onOpenHouse: (() => void) | null = null,
+		barnPrompt: string | null = null,
 	): void {
 		// A nearby gate owns the prompt and the E key while it is in range.
 		if (gatePrompt) {
@@ -34,6 +35,11 @@ export class FarmTravel {
 		if (housePrompt && onOpenHouse) {
 			this.setPrompt(housePrompt);
 			if (input.consumePress("KeyE", "Enter")) onOpenHouse();
+			return;
+		}
+		// The barn only shows its prompt; the scene consumes the E press.
+		if (barnPrompt) {
+			this.setPrompt(barnPrompt);
 			return;
 		}
 		const canBoard = isNearFarmTrain(player.pos.x, player.pos.y) && train.canBoard();

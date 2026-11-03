@@ -17,6 +17,7 @@ defmodule Grange.FarmStore do
   alias Grange.{
     Barn,
     BarnItem,
+    BarnStorage,
     Crops,
     Farm,
     FarmAction,
@@ -79,7 +80,8 @@ defmodule Grange.FarmStore do
           is_public: farm.is_public,
           visitor_edit: farm.visitor_edit,
           prop_overrides: FarmProps.overrides(owner),
-          prop_inventory: FarmProps.inventory(owner)
+          prop_inventory: FarmProps.inventory(owner),
+          storage: BarnStorage.inventory(farm)
         }
     end
   end
@@ -117,10 +119,7 @@ defmodule Grange.FarmStore do
   @doc "Updates whether a farm is public and whether visitors may edit it."
   @spec update_settings(String.t(), map()) :: {:ok, map()} | {:error, String.t()}
   def update_settings(owner, attrs) do
-    case FarmSettings.update(owner, attrs) do
-      {:ok, _farm} -> refresh(owner)
-      {:error, reason} -> {:error, reason}
-    end
+    with {:ok, _farm} <- FarmSettings.update(owner, attrs), do: refresh(owner)
   end
 
   @spec prop_action(String.t(), map()) :: {:ok, map()} | {:error, String.t()}
@@ -376,9 +375,8 @@ defmodule Grange.FarmStore do
     broadcast_lobby()
   end
 
-  defp broadcast_farm(owner) do
-    GrangeWeb.Endpoint.broadcast("farm:" <> owner, "farmUpdate", %{farm: view(owner)})
-  end
+  defp broadcast_farm(owner),
+    do: GrangeWeb.Endpoint.broadcast("farm:" <> owner, "farmUpdate", %{farm: view(owner)})
 
   defp broadcast_lobby do
     GrangeWeb.Endpoint.broadcast(@lobby_topic, "farms", %{farms: summaries()})

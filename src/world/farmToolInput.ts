@@ -23,6 +23,10 @@ export interface FarmToolHost {
 	placement: FarmPlacementPreview;
 	fencePlacement: FencePlacementPreview;
 	canEdit(): boolean;
+	/** Props additionally allow admins to rearrange any farm. */
+	canMoveProps(): boolean;
+	/** Opens barn storage when the click lands on the barn; true if handled. */
+	handleBarnClick(pos: ex.Vector, item: string | null): boolean;
 	isDeactivated(): boolean;
 	report(text: string): void;
 	reportReadOnly(): void;
@@ -48,8 +52,9 @@ export class FarmToolInput {
 			if (this.disabled()) return;
 			const item = selectedFarmItem();
 			const farm = useGameStore.getState().activeFarm;
+			if (this.host.handleBarnClick(evt.worldPos, item)) return;
 			if (item && isMovablePropAsset(item) && farm) {
-				if (!this.host.canEdit()) return this.host.reportReadOnly();
+				if (!this.host.canMoveProps()) return this.host.reportReadOnly();
 				if ((farm.prop_inventory[item] ?? 0) > 0)
 					this.host.placement.start(item, evt.worldPos, this.host.player.pos, farm);
 				else this.host.report(`No ${item} in inventory.`);
@@ -77,7 +82,7 @@ export class FarmToolInput {
 		});
 		pointers.primary.on("up", (evt) => {
 			const farm = useGameStore.getState().activeFarm;
-			if (this.host.placement.active && farm && !this.disabled() && this.host.canEdit() &&
+			if (this.host.placement.active && farm && !this.disabled() && this.host.canMoveProps() &&
 				selectedFarmItem() === this.host.placement.selectedAsset) {
 				const result = this.host.placement.finish(evt.worldPos, this.host.player.pos, farm);
 				if (result) placeFarmProp(result.asset, result.placement, farm,
@@ -110,7 +115,9 @@ export class FarmToolInput {
 		const column = Math.floor(worldPos.x / TILE_SIZE);
 		const row = Math.floor(worldPos.y / TILE_SIZE);
 		this.host.updateHover(worldPos);
-		if (!this.host.canEdit()) {
+		const canEdit = this.host.canEdit();
+		const canMoveProps = this.host.canMoveProps();
+		if (!canEdit && !canMoveProps) {
 			this.host.reportReadOnly();
 			return;
 		}
@@ -122,10 +129,15 @@ export class FarmToolInput {
 		this.strokeTiles.add(strokeKey);
 
 		const item = selectedFarmItem();
-		if (handleFarmPropClick(item, worldPos, this.host.farmProps,
+		// Admins may dig props anywhere, but farming/fences still need edit.
+		if (canMoveProps && handleFarmPropClick(item, worldPos, this.host.farmProps,
 			useGameStore.getState().activeFarm, this.host.owner,
 			(message) => this.host.report(message)))
 			return;
+		if (!canEdit) {
+			this.host.reportReadOnly();
+			return;
+		}
 
 		if (item === "gate" || item === "shovel") {
 			actOnFence(this.host.owner, column, row, item, this.host.blocks, this.host.player.pos,
