@@ -1,6 +1,5 @@
 import type * as ex from "excalibur";
 import { useInventoryStore } from "../inventory/inventoryStore";
-import type { ItemId } from "../inventory/items";
 import { opensBarn } from "./barnActions";
 import type { FarmPropLayer } from "./farmPropLayer";
 import type { InputManager } from "./InputManager";
@@ -32,7 +31,7 @@ export class FarmBarn {
 	/** Opens on a click that lands on the barn; true when it handled the click. */
 	handleClick(
 		worldPos: ex.Vector,
-		item: ItemId | null,
+		item: string | null,
 		props: FarmPropLayer,
 	): boolean {
 		const target = props.pick(worldPos.x, worldPos.y);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mayMoveProps } from "./farmPropActions";
+import { canMoveProps } from "./farmPermissions";
 import { footprintTileSpan, propPlacementReason, snapPropAnchor } from "./propPlacement";
 import { farmPlacementFootprints } from "./sceneObstacles";
 import { propObstacles } from "./walkCollisions";
@@ -48,13 +48,20 @@ describe("prop placement", () => {
 });
 
 describe("prop permissions", () => {
+	const privateFarm = { visitor_edit: false };
+	const editableFarm = { visitor_edit: true };
+
 	it("lets owners and admins rearrange props", () => {
-		expect(mayMoveProps(true, false)).toBe(true);
-		expect(mayMoveProps(false, true)).toBe(true);
-		expect(mayMoveProps(true, true)).toBe(true);
+		expect(canMoveProps(privateFarm, true, false)).toBe(true);
+		expect(canMoveProps(privateFarm, false, true)).toBe(true);
+		expect(canMoveProps(privateFarm, true, true)).toBe(true);
 	});
 
-	it("keeps non-admin visitors read-only", () => {
-		expect(mayMoveProps(false, false)).toBe(false);
+	it("lets visitors rearrange props while the owner allows editing", () => {
+		expect(canMoveProps(editableFarm, false, false)).toBe(true);
+	});
+
+	it("keeps non-admin visitors read-only on a read-only farm", () => {
+		expect(canMoveProps(privateFarm, false, false)).toBe(false);
 	});
 });
