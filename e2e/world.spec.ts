@@ -42,7 +42,7 @@ test("the train travels between the farm and marketplace", async ({ page }) => {
 	await resetServer();
 	await register(page, uniqueName("Traveler"));
 
-	const canvas = page.locator("canvas");
+	const canvas = page.locator("canvas.farm-map-canvas");
 	await expect(canvas).toHaveAttribute("aria-label", /^Farm map/);
 	await page.waitForLoadState("networkidle");
 
@@ -64,7 +64,7 @@ test("the marketplace casino opens and returns outside", async ({ page }) => {
 	await resetServer();
 	await register(page, uniqueName("Highroller"));
 
-	const canvas = page.locator("canvas");
+	const canvas = page.locator("canvas.farm-map-canvas");
 	const prompt = page.getByTestId("travel-prompt");
 	await page.waitForLoadState("networkidle");
 	await page.keyboard.down("d");
@@ -86,11 +86,11 @@ test("the marketplace casino opens and returns outside", async ({ page }) => {
 	await expect(canvas).toHaveAttribute("aria-label", /^Marketplace map/);
 });
 
-test("the seed market opens a window with a seeds tab", async ({ page }) => {
+test("the seed market opens the Seed Stall buy view", async ({ page }) => {
 	await resetServer();
 	await register(page, uniqueName("Seedseller"));
 
-	const canvas = page.locator("canvas");
+	const canvas = page.locator("canvas.farm-map-canvas");
 	const prompt = page.getByTestId("travel-prompt");
 	await page.waitForLoadState("networkidle");
 	await page.keyboard.down("d");
@@ -108,19 +108,40 @@ test("the seed market opens a window with a seeds tab", async ({ page }) => {
 
 	const market = page.getByTestId("market-window");
 	await expect(market).toBeVisible();
-	await expect(page.getByTestId("market-title")).toHaveText("Seed Market");
-	await expect(page.getByTestId("market-tab-seeds")).toBeVisible();
+	await expect(page.getByTestId("market-title")).toHaveText(
+		"GRANGE MARKET - SEED STALL",
+	);
+	await expect(page.getByTestId("market-stall-seed")).toBeVisible();
+	await expect(page.getByTestId("market-stall-produce")).toBeVisible();
 	await expect(page.getByTestId("market-item-tomato-seed")).toContainText(
 		"Tomato Seeds",
 	);
-	await expect(page.getByTestId("market-owned-tomato-seed")).toContainText("10");
-	// The grid has 8 cells; three are filled by the seed cards.
-	await expect(page.getByTestId("market-slot")).toHaveCount(5);
+	await expect(page.getByTestId("market-price-tomato-seed")).toContainText("8 GC");
+	await expect(page.getByTestId("market-inventory-grid")).toBeVisible();
+	// The numeric hotbar stays docked while the shop is open.
+	await expect(page.getByTestId("slot-hotbar-1")).toHaveAttribute(
+		"data-count",
+		"10",
+	);
 	await expect(page.getByTestId("farm-balance")).toContainText("100");
 
-	await page.getByTestId("market-action-tomato-seed").click();
+	await page.getByTestId("market-buy-tomato-seed").click();
 	await expect(page.getByTestId("farm-balance")).toContainText("92");
-	await expect(page.getByTestId("market-owned-tomato-seed")).toContainText("11");
+	// Seeds land in the tomato seed stack in the hotbar.
+	await expect(page.getByTestId("slot-hotbar-1")).toHaveAttribute(
+		"data-count",
+		"11",
+	);
+
+	// The stalls swap with the buttons and with Tab.
+	await page.getByTestId("market-stall-produce").click();
+	await expect(page.getByTestId("market-title")).toHaveText(
+		"GRANGE MARKET - PRODUCE STALL",
+	);
+	await page.keyboard.press("Tab");
+	await expect(page.getByTestId("market-title")).toHaveText(
+		"GRANGE MARKET - SEED STALL",
+	);
 
 	// Seeds use the same quantity stepper as selling: step up to 3 and the
 	// button totals the cost.
@@ -141,10 +162,13 @@ test("the seed market opens a window with a seeds tab", async ({ page }) => {
 	// The purchases are account state, not a local bump that resets to 10 on
 	// load: one single buy plus the bulk buy of three leaves 14 tomato seeds.
 	await page.reload();
-	await expect(page.getByTestId("slot-hotbar-1")).toHaveAttribute("data-count", "14");
+	await expect(page.getByTestId("slot-hotbar-1")).toHaveAttribute(
+		"data-count",
+		"14",
+	);
 });
 
-test("the produce market opens sell, tools, and train tabs", async ({
+test("the produce market opens the Produce Stall sell grid", async ({
 	page,
 }) => {
 	await resetServer();
@@ -157,7 +181,7 @@ test("the produce market opens sell, tools, and train tabs", async ({
 	await page.keyboard.up("d");
 	await expect(prompt).toContainText("travel to the marketplace");
 	await page.keyboard.press("e");
-	await expect(page.locator("canvas")).toHaveAttribute(
+	await expect(page.locator("canvas.farm-map-canvas")).toHaveAttribute(
 		"aria-label",
 		/^Marketplace map/,
 	);
@@ -170,24 +194,29 @@ test("the produce market opens sell, tools, and train tabs", async ({
 
 	const market = page.getByTestId("market-window");
 	await expect(market).toBeVisible();
-	await expect(page.getByTestId("market-title")).toHaveText("Produce Market");
-	await expect(page.getByTestId("market-tab-sell")).toBeVisible();
-	await expect(page.getByTestId("market-tab-tools")).toBeVisible();
-	await expect(page.getByTestId("market-tab-train")).toBeVisible();
-	await expect(page.getByTestId("market-item-tomato")).toContainText("Tomato");
-	await expect(page.getByTestId("market-owned-tomato")).toContainText("0");
+	await expect(page.getByTestId("market-title")).toHaveText(
+		"GRANGE MARKET - PRODUCE STALL",
+	);
+	await expect(page.getByTestId("market-subtab-sell")).toBeVisible();
+	await expect(page.getByTestId("market-subtab-fish")).toBeVisible();
+	await expect(page.getByTestId("market-subtab-rods")).toBeVisible();
+	await expect(page.getByTestId("market-subtab-tools")).toBeVisible();
+	await expect(page.getByTestId("market-subtab-train")).toBeVisible();
+	await expect(page.getByTestId("market-item-tomato")).toContainText("TOMATO");
+	await expect(page.getByTestId("market-item-midas_wheat")).toContainText(
+		"MIDAS WHEAT",
+	);
+	await expect(page.getByTestId("market-stock-tomato")).toContainText("STOCK: 0");
 	// Nothing harvested yet, so selling is unavailable.
-	await expect(page.getByTestId("market-action-tomato")).toBeDisabled();
-	await expect(page.getByTestId("market-max-tomato")).toBeVisible();
-	await expect(page.getByTestId("market-max-tomato")).toBeDisabled();
-	// The grid has 12 cells; six are filled by the produce cards.
-	await expect(page.getByTestId("market-slot")).toHaveCount(6);
+	await expect(page.getByTestId("market-sell-tomato")).toBeDisabled();
+	await expect(page.getByTestId("market-sellall-tomato")).toBeDisabled();
 
-	await page.getByTestId("market-tab-tools").click();
-	await expect(page.getByTestId("market-slot")).toHaveCount(8);
+	// Secondary tabs keep the fish/rods/tools/train stock for now.
+	await page.getByTestId("market-subtab-fish").click();
+	await expect(page.locator(".market-generic-grid")).toBeVisible();
 
-	await page.getByTestId("market-tab-train").click();
-	await expect(page.getByTestId("market-slot")).toHaveCount(6);
+	await page.getByTestId("market-subtab-tools").click();
+	await expect(page.locator(".market-generic-grid")).toBeVisible();
 
 	await page.getByTestId("market-close").click();
 	await expect(market).toHaveCount(0);
@@ -255,7 +284,7 @@ test("selling a harvested tomato credits the wallet", async ({
 	await page.waitForTimeout(1_000);
 	await page.keyboard.up("d");
 	await page.keyboard.press("e");
-	await expect(page.locator("canvas")).toHaveAttribute(
+	await expect(page.locator("canvas.farm-map-canvas")).toHaveAttribute(
 		"aria-label",
 		/^Marketplace map/,
 	);
@@ -265,13 +294,16 @@ test("selling a harvested tomato credits the wallet", async ({
 
 	const market = page.getByTestId("market-window");
 	await expect(market).toBeVisible();
-	await expect(page.getByTestId("market-owned-tomato")).toContainText("1");
+	await expect(page.getByTestId("market-stock-tomato")).toContainText("STOCK: 1");
+	await expect(page.getByTestId("market-sell-tomato")).toBeEnabled();
+	await expect(page.getByTestId("market-sellall-tomato")).toBeEnabled();
 
-	// Sell the single tomato for its crop value.
-	await page.getByTestId("market-action-tomato").click();
-	await expect(page.getByTestId("market-owned-tomato")).toContainText("0");
+	// SELL ALL moves the whole stack for its crop value.
+	await page.getByTestId("market-sellall-tomato").click();
+	await expect(page.getByTestId("market-stock-tomato")).toContainText("STOCK: 0");
 	await expect(page.getByTestId("farm-balance")).toContainText("105");
-	await expect(page.getByTestId("market-action-tomato")).toBeDisabled();
+	await expect(page.getByTestId("market-sell-tomato")).toBeDisabled();
+	await expect(page.getByTestId("market-sellall-tomato")).toBeDisabled();
 	// Selling also clears it from the local inventory, so it can't linger.
 	await page.getByTestId("market-close").click();
 	await expect(page.locator('[data-item="tomato"]')).toHaveCount(0);
@@ -306,7 +338,7 @@ test("the blackjack table opens a playable sub-screen", async ({ page }) => {
 	await resetServer();
 	await register(page, uniqueName("Cardcounter"));
 
-	const canvas = page.locator("canvas");
+	const canvas = page.locator("canvas.farm-map-canvas");
 	const prompt = page.getByTestId("travel-prompt");
 	await page.waitForLoadState("networkidle");
 
