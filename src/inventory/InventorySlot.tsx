@@ -28,6 +28,7 @@ export function InventorySlot({ area, index, selected, keyHint, onReceiveBarn }:
 		area === "grid" ? s.grid[index] : s.hotbar[index],
 	);
 	const moveStack = useInventoryStore((s) => s.moveStack);
+	const quickMove = useInventoryStore((s) => s.quickMove);
 	const splitHalf = useInventoryStore((s) => s.splitHalf);
 	const selectHotbar = useInventoryStore((s) => s.selectHotbar);
 
@@ -59,7 +60,12 @@ export function InventorySlot({ area, index, selected, keyHint, onReceiveBarn }:
 		if (barn) onReceiveBarn?.(barn);
 	}
 
-	function onClick() {
+	function onClick(e: React.MouseEvent) {
+		// Shift-click flings the whole stack to the other area (hotbar <-> grid).
+		if (e.shiftKey) {
+			quickMove(ref);
+			return;
+		}
 		if (area === "hotbar") selectHotbar(index);
 	}
 
@@ -84,7 +90,9 @@ export function InventorySlot({ area, index, selected, keyHint, onReceiveBarn }:
 		<button
 			type="button"
 			aria-label={
-				def ? `${def.name}${slot.count > 1 ? ` × ${slot.count}` : ""}` : "Empty slot"
+				def
+					? `${def.name}${slot.count > 1 ? ` × ${slot.count}` : ""}`
+					: "Empty slot"
 			}
 			data-testid={`slot-${area}-${index}`}
 			data-item={slot.itemId ?? ""}

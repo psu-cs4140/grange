@@ -65,6 +65,10 @@ interface InventoryState {
 	toggleInventory: () => void;
 	setBarnOpen: (open: boolean) => void;
 	moveStack: (from: SlotRef, to: SlotRef) => void;
+	/** Sends a stack to the other area (hotbar <-> grid), topping up existing
+	 *  partial stacks of the same item first, then the first empty slot.
+	 *  Used by shift-click. */
+	quickMove: (from: SlotRef) => void;
 	splitHalf: (from: SlotRef, to: SlotRef) => void;
 	addItem: (itemId: ItemId, count: number) => number;
 	/** Removes up to `count` of an item across slots. Returns how many were removed. */
@@ -138,6 +142,28 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
 		}
 
 		set({ grid: nextGrid, hotbar: nextHotbar });
+	},
+
+	quickMove: (from) => {
+		const source = slotsOf(get(), from.area)[from.index];
+		if (!source?.itemId || source.count <= 0) return;
+		const itemId = source.itemId;
+		const destArea: SlotArea = from.area === "grid" ? "hotbar" : "grid";
+		const max = ITEMS[itemId].maxStack;
+		// Top up existing partial stacks of the same item first, so a quick move
+		// can't leave a fragmented pile behind.
+		if (max > 1) {
+			for (let i = 0; i < slotsOf(get(), destArea).length; i += 1) {
+				const slot = slotsOf(get(), destArea)[i];
+				if (slot.itemId !== itemId || slot.count >= max) continue;
+				get().moveStack(from, { area: destArea, index: i });
+				if (!slotsOf(get(), from.area)[from.index]?.itemId) return;
+			}
+		}
+		const still = slotsOf(get(), from.area)[from.index];
+		if (!still?.itemId) return;
+		const empty = slotsOf(get(), destArea).findIndex((slot) => !slot.itemId);
+		if (empty >= 0) get().moveStack(from, { area: destArea, index: empty });
 	},
 
 	splitHalf: (from, to) => {
@@ -296,27 +322,4 @@ export function isInventoryBlockingInput(): boolean {
 	);
 }
 
-export function countItem(
-	state: Pick<InventoryState, "grid" | "hotbar">,
-	itemId: ItemId,
-): number {
-	let total = 0;
-	for (const slot of [...state.grid, ...state.hotbar]) {
-		if (slot.itemId === itemId) total += slot.count;
-	}
-	return total;
-}
-
-/** How many more of an item the inventory can hold across all slots. */
-export function freeSpaceFor(
-	state: Pick<InventoryState, "grid" | "hotbar">,
-	itemId: ItemId,
-): number {
-	const max = ITEMS[itemId].maxStack;
-	let space = 0;
-	for (const slot of [...state.hotbar, ...state.grid]) {
-		if (!slot.itemId) space += max;
-		else if (slot.itemId === itemId) space += Math.max(0, max - slot.count);
-	}
-	return space;
-}
+export { countItem, freeSpaceFor } from "./inventoryQueries";

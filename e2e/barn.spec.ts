@@ -1,18 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
-import { register, resetServer, uniqueName, waitForWorld } from "./helpers";
+import { clickWorld, registerFast, uniqueName, waitForWorld } from "./helpers";
 
 /** Where the barn's sprite sits on the farm map (bottom-anchored). */
 const BARN = { x: 935, y: 200 };
-
-/** Clicks a world point on the farm canvas, like farm.spec.ts does. */
-async function clickWorld(page: Page, worldX: number, worldY: number) {
-	const box = await page.locator(".farm-map-canvas").boundingBox();
-	expect(box).not.toBeNull();
-	await page.mouse.click(
-		box!.x + (worldX / 1152) * box!.width,
-		box!.y + (worldY / 768) * box!.height,
-	);
-}
 
 /** Clicks the barn on the map and waits for the storage window. */
 async function openBarn(page: Page) {
@@ -40,8 +30,7 @@ async function walkToBarn(page: Page) {
 test("the barn stores a stack and returns it to the inventory", async ({
 	page,
 }) => {
-	await resetServer();
-	await register(page, uniqueName("Storer"));
+	await registerFast(page, uniqueName("Storer"));
 
 	// Select the seed-bag stack (hotbar slot 2) before opening the barn.
 	await page.keyboard.press("2");
@@ -79,8 +68,7 @@ test("the barn stores a stack and returns it to the inventory", async ({
 });
 
 test("standing at the barn and pressing E opens storage", async ({ page }) => {
-	await resetServer();
-	await register(page, uniqueName("Walker"));
+	await registerFast(page, uniqueName("Walker"));
 
 	await walkToBarn(page);
 	await page.keyboard.press("e");
@@ -93,8 +81,7 @@ test("standing at the barn and pressing E opens storage", async ({ page }) => {
 });
 
 test("barn storage survives a reload", async ({ page }) => {
-	await resetServer();
-	await register(page, uniqueName("Keeper"));
+	await registerFast(page, uniqueName("Keeper"));
 
 	await page.keyboard.press("2");
 	await openBarn(page);
