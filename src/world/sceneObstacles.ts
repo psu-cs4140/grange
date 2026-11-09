@@ -39,6 +39,7 @@ const marketplaceFootprints: Partial<
 	"game-hall": { width: 0.9, depth: 115 },
 	"livestock-pavilion": { width: 0.8, depth: 68 },
 	"village-bank": { width: 0.86, depth: 78 },
+	"hardware-store": { width: 0.9, depth: 88 },
 	"seed-display": { width: 0.85, depth: 45 },
 	"produce-cart": { width: 0.85, depth: 55 },
 	"notice-board": { width: 0.75, depth: 35 },
@@ -80,7 +81,7 @@ let currentFarmLandLevel = 0;
 function rebuildFarmObstacles(): void {
 	const bounds = farmBounds(currentFarmLandLevel);
 	const water = { left: bounds.minColumn * TILE_SIZE,
-		right: (bounds.maxColumn + 1) * TILE_SIZE, top: 11 * TILE_SIZE, bottom: MAP_HEIGHT };
+		right: (bounds.maxColumn + 1) * TILE_SIZE, top: 11 * TILE_SIZE - 36, bottom: MAP_HEIGHT };
 	farmWalkObstacles.splice(0, Infinity,
 		...propObstacles(currentFarmProps, farmFootprints),
 		...fenceObstacles(currentFarmFences, currentFarmGates),

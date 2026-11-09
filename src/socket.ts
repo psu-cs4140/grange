@@ -12,6 +12,7 @@ import { countItem, useInventoryStore } from "./inventory/inventoryStore";
 import { reconcileServerItems } from "./inventory/itemSync";
 import type { ItemId } from "./inventory/items";
 import { useGameStore } from "./store";
+import { attachFarmPresence, resetFarmPresence } from "./world/farmPresence";
 
 /** Session token used to authenticate the socket handshake. */
 let authToken: string | null = null;
@@ -40,10 +41,22 @@ export interface FarmActionAck extends Ack {
 	drops?: string[];
 }
 
+export interface FarmSettings {
+	is_public: boolean;
+	visitor_edit: boolean;
+}
+
 /** The lobby channel is shared by the whole app; the farm channel tracks visits. */
 let lobby: Channel | null = null;
 let farmChannel: Channel | null = null;
 let farmOwner: string | null = null;
+/**
+ * A pause requested while the farm join was still in flight. The presence is
+ * attached on join, so the pause has to be remembered and applied then;
+ * otherwise a player who boots straight into a hub leaves an avatar idling on
+ * their farm.
+ */
+let farmPresencePaused = false;
 
 function reasonOf(payload: unknown): string | undefined {
 	if (payload && typeof payload === "object") {
@@ -123,15 +136,29 @@ export function requestFarms(): void {
 		});
 }
 
+/**
+ * Joins the farm channel for `owner` and (optionally) publishes presence.
+ *
+ * `presence` is false when the world boots straight into a hub: the SPA still
+ * needs the farm snapshot for the HUD and `data-world-ready`, but the player
+ * is not standing on the farm.
+ */
 export function emitVisitFarm(
 	owner: string,
 	cb?: (res: FarmAck) => void,
+	presence = true,
 ): void {
 	if (farmChannel && farmOwner === owner) {
+		if (presence) {
+			farmPresencePaused = false;
+			attachFarmPresence(farmChannel);
+			farmChannel.push("resumePresence", {});
+		}
 		cb?.({ ok: true });
 		return;
 	}
 
+	farmPresencePaused = !presence;
 	const channel = socket.channel(`farm:${owner}`, {});
 
 	channel.on("farmUpdate", (payload: unknown) => {
@@ -149,6 +176,12 @@ export function emitVisitFarm(
 			useGameStore.getState().setActiveFarm(farm);
 			// Leaving the old channel drops this socket's subscription.
 			if (previous && previous !== channel) previous.leave();
+			if (farmPresencePaused) {
+				resetFarmPresence();
+				channel.push("pausePresence", {});
+			} else {
+				attachFarmPresence(channel);
+			}
 			cb?.({ ok: true, farm });
 		})
 		.receive("error", (payload: unknown) =>
@@ -158,17 +191,55 @@ export function emitVisitFarm(
 }
 
 export function emitLeaveFarm(cb?: (res: Ack) => void): void {
+	leaveFarmChannel(true);
+	cb?.({ ok: true });
+}
+
+/**
+ * Pauses farm presence while travelling into a hub but keeps the farm channel
+ * joined, so owner-only actions such as selling produce still work. The active
+ * farm snapshot is kept; returning to the farm resumes presence.
+ */
+export function emitPauseFarmVisit(cb?: (res: Ack) => void): void {
+	farmPresencePaused = true;
+	resetFarmPresence();
+	farmChannel?.push("pausePresence", {});
+	cb?.({ ok: true });
+}
+
+function leaveFarmChannel(clearFarm: boolean): void {
 	const channel = farmChannel;
-	if (!channel) {
-		cb?.({ ok: true });
+	farmChannel = null;
+	farmOwner = null;
+	farmPresencePaused = false;
+	resetFarmPresence();
+	channel?.leave();
+	if (clearFarm) useGameStore.getState().setActiveFarm(null);
+}
+
+/** Owner-only: changes farm visibility and visitor editing. */
+export function emitUpdateFarmSettings(
+	owner: string,
+	settings: FarmSettings,
+	cb?: (res: FarmAck) => void,
+): void {
+	const channel = farmChannel;
+	if (!channel || farmOwner !== owner) {
+		cb?.({ ok: false, error: "not visiting farm" });
 		return;
 	}
 
-	channel.leave();
-	farmChannel = null;
-	farmOwner = null;
-	useGameStore.getState().setActiveFarm(null);
-	cb?.({ ok: true });
+	channel
+		.push("updateSettings", settings)
+		.receive("ok", (payload: unknown) => {
+			const { farm } = payload as { farm?: ActiveFarm };
+			if (farm) useGameStore.getState().setActiveFarm(farm);
+			cb?.({ ok: true, farm });
+		})
+		.receive("error", (payload: unknown) =>
+			cb?.({ ok: false, error: reasonOf(payload) ?? "Could not update farm" }),
+		)
+		.receive("timeout", () => cb?.({ ok: false, error: "Timed out" }));
 }
 
 export function emitFarmAction(

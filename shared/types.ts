@@ -6,6 +6,16 @@ export interface Player {
 	name: string;
 }
 
+/** The shared, multiplayer areas of the hub world. Farms are not hubs. */
+export type HubArea = "marketplace" | "casino";
+
+/** Another player standing in the same hub area. */
+export interface HubPeer {
+	name: string;
+	x: number;
+	y: number;
+}
+
 /** One tile of a farm's field, as sent by the server. */
 export interface FarmTile {
 	x: number;
@@ -28,6 +38,12 @@ export interface FenceGate {
 	open: boolean;
 }
 
+/** A sprinkler anchored at the top-left tile of the 2x2 block it waters. */
+export interface FarmSprinkler {
+	x: number;
+	y: number;
+}
+
 /** The full field and barn inventory for one farm. */
 export interface ActiveFarm {
 	owner: string;
@@ -39,11 +55,23 @@ export interface ActiveFarm {
 	/** Livestock owned by this farm, keyed by animal species. */
 	animals: Record<string, number>;
 	land_level?: number;
+	/** Whether strangers may join this farm. */
+	is_public: boolean;
+	/** Whether visitors may farm, build fences/gates, and move props. */
+	visitor_edit: boolean;
 	fences: Array<{ x: number; y: number }>;
 	fence_count: number;
 	gates: FenceGate[];
 	gate_count: number;
-	prop_overrides: Array<{ index: number; asset: string; x: number; y: number; carried: boolean }>;
+	sprinklers: FarmSprinkler[];
+	sprinkler_count: number;
+	prop_overrides: Array<{
+		index: number;
+		asset: string;
+		x: number;
+		y: number;
+		carried: boolean;
+	}>;
 	prop_inventory: Record<string, number>;
 	storage: Record<string, number>;
 }
@@ -74,6 +102,8 @@ export interface FarmSummary {
 	watered: number;
 	ready: number;
 	tomatoes: number;
+	/** Whether the farm currently accepts visitors. */
+	is_public: boolean;
 }
 
 /** A player's request to act on a tile of their own farm. */
@@ -86,7 +116,9 @@ export type FarmAction = {
 		| "place_fence"
 		| "remove_fence"
 		| "place_gate"
-		| "remove_gate";
+		| "remove_gate"
+		| "place_sprinkler"
+		| "remove_sprinkler";
 	x: number;
 	y: number;
 	/** Seed crop to plant (kind === "plant"). */
