@@ -18,7 +18,8 @@ import { FarmPropLayer } from "./farmPropLayer";
 import { FarmPlacementPreview } from "./FarmPlacementPreview";
 import { FarmTravel } from "./FarmTravel";
 import { FarmFishing } from "./farmFishing";
-import { canEditFarm } from "./farmPermissions";
+import { canEditFarm, canMoveProps } from "./farmPermissions";
+import { FarmBarn } from "./FarmBarn";
 import { FarmScenePresence } from "./farmScenePresence";
 import { FarmToolInput } from "./farmToolInput";
 import { updateFarmerGraphics } from "./farmerSprite";
@@ -67,6 +68,7 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 	private lastWorldPos: ex.Vector | null = null;
 	private deactivated = false;
 	private readonly travel: FarmTravel;
+	private readonly barn: FarmBarn;
 	private readonly fishing: FarmFishing;
 	private readonly onOpenHouse: () => void;
 	private train!: TrainController;
@@ -96,6 +98,7 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 			onAreaChange,
 			onOpenTravel,
 		);
+		this.barn = new FarmBarn(isOwner);
 	}
 
 	override onInitialize(engine: ex.Engine): void {
@@ -135,10 +138,12 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 			placement: this.placement,
 			fencePlacement: this.fencePlacement,
 			sprinklerPlacement: this.sprinklerPlacement,
-			canEdit: () => this.canEdit(),
+			canEdit: () => canEditFarm(useGameStore.getState().activeFarm, this.isOwner),
+			canMoveProps: () => canMoveProps(useGameStore.getState().activeFarm, this.isOwner, Boolean(useGameStore.getState().user?.is_admin)),
+			handleBarnClick: (pos, item) => this.barn.handleClick(pos, item, this.farmProps),
 			isDeactivated: () => this.deactivated,
 			report: (message) => this.report(message),
-			reportReadOnly: () => this.reportReadOnly(),
+			reportReadOnly: () => this.report("The owner has visitor editing off."),
 			updateHover: (pos) => this.updateHover(pos),
 			performAction: (column, row) => this.performAction(column, row),
 		});
@@ -234,13 +239,16 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 			gate?.prompt ?? null,
 			housePrompt,
 			this.onOpenHouse,
+			this.barn.prompt(this.player, this.farmProps),
 		);
 		if (gate && this.inputManager.consumePress("KeyE", "Enter")) {
 			toggleGate(this.owner, gate.gate, (message) => this.report(message));
 		}
+		// The barn claims E before fishing drains it, but only while in reach.
+		this.barn.update(this.player, this.inputManager, this.farmProps);
 		this.fishing.update(this.player.pos.y, this.inputManager);
 
-		if (this.canEdit()) farmActionOnSpace(this.inputManager, this.player.pos,
+		if (canEditFarm(farm, this.isOwner)) farmActionOnSpace(this.inputManager, this.player.pos,
 			(column, row) => this.performAction(column, row));
 		this.syncTilesFromServer();
 		this.tileSync.syncGrowing(useGameStore.getState().activeFarm, Date.now());
@@ -286,14 +294,6 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 		this.travel.deactivate();
 		this.presence?.clear();
 		useComboStore.getState().clearCombo();
-	}
-
-	private canEdit(): boolean {
-		return canEditFarm(useGameStore.getState().activeFarm, this.isOwner);
-	}
-
-	private reportReadOnly(): void {
-		this.report("The owner has visitor editing off.");
 	}
 
 	private housePrompt(): string | null {
