@@ -4,9 +4,14 @@ import { isInventoryBlockingInput } from "../inventory/inventoryStore";
 import { useGameStore } from "../store";
 import type { BlockRegistry } from "./blocking";
 import type { FencePlacementPreview } from "./FencePlacementPreview";
+import { fenceCornerAt } from "./FencePlacementPreview";
 import { actOnFence, selectedFarmItem } from "./fenceActions";
+import { ownsFenceCorner } from "./fenceData";
 import { handleFarmPropClick, placeFarmProp } from "./farmPropActions";
 import type { FarmPlacementPreview } from "./FarmPlacementPreview";
+import type { AnimalPlacementPreview } from "./AnimalPlacementPreview";
+import type { AnimalLayer } from "./AnimalLayer";
+import { isAnimalId, pickupAnimal } from "./animalPlacement";
 import type { FarmPropLayer } from "./farmPropLayer";
 import { actOnSprinkler, sprinklerNear } from "./sprinklerActions";
 import type { SprinklerPlacementPreview } from "./SprinklerPlacementPreview";
@@ -25,6 +30,8 @@ export interface FarmToolHost {
 	placement: FarmPlacementPreview;
 	fencePlacement: FencePlacementPreview;
 	sprinklerPlacement: SprinklerPlacementPreview;
+	animalPlacement: AnimalPlacementPreview;
+	animals: AnimalLayer;
 	canEdit(): boolean;
 	isDeactivated(): boolean;
 	report(text: string): void;
@@ -68,6 +75,13 @@ export class FarmToolInput {
 				if (!this.host.canEdit()) return this.host.reportReadOnly();
 				return this.host.sprinklerPlacement.start(evt.worldPos, farm);
 			}
+			if (isAnimalId(item) && farm) {
+				if (!this.host.canEdit()) return this.host.reportReadOnly();
+				if (useGameStore.getState().username !== this.host.owner)
+					return this.host.report("Only the farm owner can place animals.");
+				return this.host.animalPlacement.start(item, evt.worldPos, farm,
+					this.host.blocks, this.host.player.pos);
+			}
 			this.painting = farmToolForItem(item) !== null;
 			this.strokeTiles.clear();
 			this.applyToolAt(evt.worldPos);
@@ -82,6 +96,8 @@ export class FarmToolInput {
 				this.host.fencePlacement.update(evt.worldPos, farm, this.host.blocks, this.host.player.pos);
 			if (this.host.sprinklerPlacement.active && farm)
 				this.host.sprinklerPlacement.update(evt.worldPos, farm);
+			if (this.host.animalPlacement.active && farm)
+				this.host.animalPlacement.update(evt.worldPos, farm, this.host.blocks, this.host.player.pos);
 			if (this.painting) this.applyToolAt(evt.worldPos);
 		});
 		pointers.primary.on("up", (evt) => {
@@ -102,6 +118,12 @@ export class FarmToolInput {
 				this.host.sprinklerPlacement.release(evt.worldPos, farm, this.host.owner,
 					(message) => this.host.report(message));
 			} else this.host.sprinklerPlacement.clear();
+			if (this.host.animalPlacement.active && farm && !this.disabled() && this.host.canEdit() &&
+				useGameStore.getState().username === this.host.owner &&
+				selectedFarmItem() === this.host.animalPlacement.selectedAnimal) {
+				this.host.animalPlacement.release(evt.worldPos, farm, this.host.blocks,
+					this.host.player.pos, this.host.owner, (message) => this.host.report(message));
+			} else this.host.animalPlacement.clear();
 			this.clear();
 		});
 	}
@@ -123,19 +145,36 @@ export class FarmToolInput {
 	private applyToolAt(worldPos: ex.Vector): void {
 		const column = Math.floor(worldPos.x / TILE_SIZE);
 		const row = Math.floor(worldPos.y / TILE_SIZE);
+		const corner = fenceCornerAt(worldPos);
+		const item = selectedFarmItem();
 		this.host.updateHover(worldPos);
 		if (!this.host.canEdit()) {
 			this.host.reportReadOnly();
 			return;
 		}
-		if (!ownsFarmTile(column, row, useGameStore.getState().activeFarm?.land_level ?? 0))
+		if (item !== "gate" && item !== "shovel" &&
+			!ownsFarmTile(column, row, useGameStore.getState().activeFarm?.land_level ?? 0))
 			return;
+		if ((item === "gate" || item === "shovel") &&
+			!ownsFenceCorner(corner.column, corner.row,
+				useGameStore.getState().activeFarm?.land_level ?? 0)) return;
 
-		const strokeKey = `${column},${row}`;
+		const strokeKey = item === "gate" ? `${corner.column},${corner.row}` : `${column},${row}`;
 		if (this.strokeTiles.has(strokeKey)) return;
 		this.strokeTiles.add(strokeKey);
 
-		const item = selectedFarmItem();
+		const clickedAnimal = this.host.animals.at(worldPos) ??
+			(useGameStore.getState().activeFarm?.placed_animals ?? [])
+				.find((animal) => animal.x === column && animal.y === row);
+		if (item === "shovel" && clickedAnimal) {
+			if (useGameStore.getState().username !== this.host.owner) {
+				this.host.report("Only the farm owner can pick up animals.");
+				return;
+			}
+			pickupAnimal(this.host.owner, clickedAnimal.species, clickedAnimal.x, clickedAnimal.y,
+				(message) => this.host.report(message));
+			return;
+		}
 		if (handleFarmPropClick(item, worldPos, this.host.farmProps,
 			useGameStore.getState().activeFarm, this.host.owner,
 			(message) => this.host.report(message)))
@@ -152,7 +191,7 @@ export class FarmToolInput {
 		}
 
 		if (item === "gate" || item === "shovel") {
-			actOnFence(this.host.owner, column, row, item, this.host.blocks, this.host.player.pos,
+			actOnFence(this.host.owner, corner.column, corner.row, item, this.host.blocks, this.host.player.pos,
 				(message) => this.host.report(message));
 			return;
 		}
