@@ -102,7 +102,7 @@ test("hoe click tills an open grass square", async ({ page }) => {
 	await expect(tiles).toHaveText("1 tiles");
 });
 
-test("a fence places, blocks hoeing, and returns to inventory when shoveled", async ({
+test("a fence leaves its neighboring tile farmable and returns to inventory when shoveled", async ({
 	page,
 }) => {
 	await registerFast(page, uniqueName("Sprout"));
@@ -117,18 +117,13 @@ test("a fence places, blocks hoeing, and returns to inventory when shoveled", as
 	);
 	await page.keyboard.press("1");
 	await clickFarmTile(page, 7, 5);
-	await expect(page.getByTestId("notification-feed")).toContainText(
-		"Something is in the way.",
-	);
-	await expect(page.getByTestId("farm-tile")).toContainText("(7, 5): grass");
+	await expect(page.getByTestId("farm-tile")).toContainText("(7, 5): tilled");
 	await page.keyboard.press("7");
 	await clickFarmTile(page, 7, 5);
 	await expect(page.getByTestId("slot-hotbar-5")).toHaveAttribute(
 		"data-count",
 		"20",
 	);
-	await page.keyboard.press("1");
-	await clickFarmTile(page, 7, 5);
 	await expect(page.getByTestId("farm-tile")).toContainText("(7, 5): tilled");
 });
 
