@@ -178,7 +178,7 @@ test("fence placement previews on hold and commits only on a valid release", asy
 	await expect(slot).toHaveAttribute("data-count", "19");
 });
 
-test("the shovel digs, previews, and drops movable props", async ({ page }) => {
+test("the shovel previews and restores a farmhouse", async ({ page }) => {
 	await registerFast(page, uniqueName("Mover"));
 
 	// A carried house previews while dragging over the still-standing well
@@ -207,6 +207,10 @@ test("the shovel digs, previews, and drops movable props", async ({ page }) => {
 	await expect(houseSlot).toHaveCount(1);
 	await page.mouse.up();
 	await expect(houseSlot).toHaveCount(0);
+});
+
+test("the shovel moves a well", async ({ page }) => {
+	await registerFast(page, uniqueName("Mover"));
 
 	// Dig the well, then drop it on open soil.
 	await page.keyboard.press("7");
@@ -216,6 +220,10 @@ test("the shovel digs, previews, and drops movable props", async ({ page }) => {
 	await wellSlot.click();
 	await clickFarmTile(page, 8, 7);
 	await expect(wellSlot).toHaveCount(0);
+});
+
+test("the shovel moves a sign onto a path", async ({ page }) => {
+	await registerFast(page, uniqueName("Mover"));
 
 	// A dug sign can be dropped straight onto the road path.
 	await page.keyboard.press("7");
