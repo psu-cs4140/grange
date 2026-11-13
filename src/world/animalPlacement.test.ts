@@ -10,7 +10,7 @@ const perimeter = [
 ];
 
 const farm: ActiveFarm = {
-	owner: "tester", tiles: [], tomatoes: 0, barn: {},
+	owner: "tester", tiles: [], tomatoes: 0, barn: {}, storage: {},
 	animals: { cow: 1, hen: 1, sheep: 1, pig: 1 }, land_level: 4,
 	is_public: false, visitor_edit: false, fences: perimeter, fence_count: 4,
 	gates: [], gate_count: 0, sprinklers: [], sprinkler_count: 0,
