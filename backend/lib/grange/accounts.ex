@@ -295,15 +295,23 @@ defmodule Grange.Accounts do
 
   # Grants admin rights and tops the balance up to the admin floor. Promotion
   # only ever raises the balance, so promoting an account never takes money away.
-  # A password, when given, is rehashed and stored so the login is known.
+  # A password, when given, is rehashed and stored so the login is known. The
+  # account is marked verified because promotion is an operator action and the
+  # resulting admin must be able to sign in immediately.
   defp promote(user, password) do
     balance = max(user.balance, @admin_balance)
+    verified_at = user.email_verified_at || DateTime.utc_now()
 
     changes =
       if password do
-        %{is_admin: true, balance: balance, password_hash: hash(password)}
+        %{
+          is_admin: true,
+          balance: balance,
+          password_hash: hash(password),
+          email_verified_at: verified_at
+        }
       else
-        %{is_admin: true, balance: balance}
+        %{is_admin: true, balance: balance, email_verified_at: verified_at}
       end
 
     case user |> Ecto.Changeset.change(changes) |> Repo.update() do
