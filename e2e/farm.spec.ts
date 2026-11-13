@@ -23,13 +23,16 @@ test("farming loop: hoe, seed, bucket, grow, scythe", async ({ page }) => {
 	// Hoe tile (9, 7)
 	await clickFarmTile(page, 9, 7);
 	await expect(page.getByTestId("farm-tile")).toContainText("(9, 7): tilled");
+	// The first click walks into tool range on newer builds. Reuse that position
+	// for the rest of this tile's farming cycle instead of walking on every step.
+	const workTile = () => clickWorld(page, 9.5 * TILE_SIZE, 7.5 * TILE_SIZE);
 
 	// Seeds (hotbar slot 2 maps to key "2")
 	await page.keyboard.press("2");
 	await expect(page.getByTestId("slot-hotbar-1")).toHaveClass(
 		/inv-slot-selected/,
 	);
-	await clickFarmTile(page, 9, 7);
+	await workTile();
 	await expect(page.getByTestId("farm-tile")).toContainText("(9, 7): planted");
 	// Planting spends one tomato seed from the pouch (10 -> 9).
 	await expect(page.getByTestId("slot-hotbar-1")).toHaveAttribute(
@@ -40,7 +43,7 @@ test("farming loop: hoe, seed, bucket, grow, scythe", async ({ page }) => {
 	// Bucket. The e2e clock can ripen the tile before this assertion runs, and
 	// `ready` also proves the watering landed.
 	await page.keyboard.press("3");
-	await clickFarmTile(page, 9, 7);
+	await workTile();
 	await expect(page.getByTestId("farm-tile")).toContainText(
 		/\(9, 7\): (?:watered|ready)/,
 	);
@@ -50,7 +53,7 @@ test("farming loop: hoe, seed, bucket, grow, scythe", async ({ page }) => {
 		timeout: 20_000,
 	});
 	await page.keyboard.press("4");
-	await clickFarmTile(page, 9, 7);
+	await workTile();
 	// The harvested tomato lands in the first free inventory slot after the tools.
 	await expect(page.locator('[data-item="tomato"]')).toHaveAttribute(
 		"data-count",
