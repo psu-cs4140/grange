@@ -34,12 +34,7 @@ import { nearbyGate, toggleGate } from "./gateInteraction";
 import { farmActionOnSpace } from "./farmSceneInput";
 import { InputManager } from "./InputManager";
 import { buildTerrain, paintFarmTerrain } from "./farmTerrain";
-import {
-	FARM_HOUSE_REACH,
-	MAP_HEIGHT,
-	MAP_WIDTH,
-	props,
-} from "./mapData";
+import { FARM_HOUSE_REACH, MAP_HEIGHT, MAP_WIDTH, props } from "./mapData";
 import { updateFarmPlayer } from "./playerMovement";
 import { setFarmLandLevel } from "./sceneObstacles";
 import { SweepFx } from "./sweepFx";
