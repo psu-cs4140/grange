@@ -5,6 +5,7 @@ import {
 	registerAccount,
 	tokenFrom,
 	uniqueName,
+	waitForWorld,
 } from "./helpers";
 
 test("an unverified account cannot sign in until the email is verified", async ({
@@ -30,11 +31,14 @@ test("an unverified account cannot sign in until the email is verified", async (
 	await expect(page.getByTestId("resend-link")).toBeVisible();
 	await expect(page).toHaveURL(`${BASE}/login`);
 
-	// The emailed link both verifies and signs the user in.
+	// The emailed link both verifies and signs the user in, then celebrates.
 	const token = tokenFrom(await mailboxFor(email), "/verify");
 	await page.goto(`${BASE}/verify?token=${encodeURIComponent(token)}`);
-	await page.waitForURL(`${BASE}/`);
-	await expect(page.getByTestId("menu-user")).toContainText(name);
+	await page.getByTestId("account-created-continue").click();
+	await page.waitForURL("**/world");
+	await waitForWorld(page);
+	await page.keyboard.press("Escape");
+	await expect(page.getByTestId("farm-map-user")).toContainText(name);
 });
 
 test("a verification link can only be used once", async ({ page }) => {
@@ -52,9 +56,12 @@ test("a verification link can only be used once", async ({ page }) => {
 	const token = tokenFrom(await mailboxFor(email), "/verify");
 	const url = `${BASE}/verify?token=${encodeURIComponent(token)}`;
 	await page.goto(url);
-	await page.waitForURL(`${BASE}/`);
+	await page.getByTestId("account-created-continue").click();
+	await page.waitForURL("**/world");
+	await waitForWorld(page);
 
-	await page.getByTestId("menu-logout").click();
+	await page.keyboard.press("Escape");
+	await page.getByTestId("logout").click();
 	await page.waitForURL(`${BASE}/`);
 	await page.goto(url);
 	await expect(page.getByTestId("verify-status")).toContainText(
@@ -69,7 +76,8 @@ test("a forgotten password can be reset through the emailed link", async ({
 	const email = `${name}@example.test`;
 	await registerAccount(page, name);
 
-	await page.getByTestId("menu-logout").click();
+	await page.keyboard.press("Escape");
+	await page.getByTestId("logout").click();
 	await page.waitForURL(`${BASE}/`);
 	await page.getByTestId("menu-login").click();
 	await page.waitForURL("**/login");

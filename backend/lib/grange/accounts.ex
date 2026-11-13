@@ -298,12 +298,20 @@ defmodule Grange.Accounts do
   # A password, when given, is rehashed and stored so the login is known.
   defp promote(user, password) do
     balance = max(user.balance, @admin_balance)
+    # Admins are minted from the CLI, which has no mailbox to confirm an
+    # address from, so promotion also marks the account usable.
+    verified_at = user.email_verified_at || DateTime.utc_now()
 
     changes =
       if password do
-        %{is_admin: true, balance: balance, password_hash: hash(password)}
+        %{
+          is_admin: true,
+          balance: balance,
+          password_hash: hash(password),
+          email_verified_at: verified_at
+        }
       else
-        %{is_admin: true, balance: balance}
+        %{is_admin: true, balance: balance, email_verified_at: verified_at}
       end
 
     case user |> Ecto.Changeset.change(changes) |> Repo.update() do
