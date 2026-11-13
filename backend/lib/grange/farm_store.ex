@@ -169,6 +169,7 @@ defmodule Grange.FarmStore do
       FarmGate,
       FarmSprinkler,
       FarmProp,
+      Grange.NpcQuestRecord,
       FarmRecord
     ]
     |> Enum.each(&Repo.delete_all/1)
@@ -199,10 +200,8 @@ defmodule Grange.FarmStore do
   end
 
   defp mutate_or_rollback(owner, actor, kind, x, y, opts) do
-    case mutate(owner, actor, kind, x, y, opts) do
-      {:error, reason} -> Repo.rollback(reason)
-      result -> result
-    end
+    with {:error, reason} <- mutate(owner, actor, kind, x, y, opts),
+         do: Repo.rollback(reason)
   end
 
   defp mutate(owner, _actor, :till, x, y, _opts) do
