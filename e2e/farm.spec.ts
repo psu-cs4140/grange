@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { TILE_SIZE } from "../src/world/mapData";
 import {
 	clickFarmTile,
 	clickWorld,
@@ -135,19 +136,22 @@ test("a gate places, opens with E, and returns to inventory when shoveled", asyn
 	await expect(page.getByTestId("notification-feed")).toBeVisible();
 
 	await page.keyboard.press("5");
-	await clickFarmTile(page, 8, 8);
+	// Gates snap to tile corners. Pick (9, 9), 44px from the player spawn,
+	// instead of a tile center that may round to a farther corner.
+	const gatePoint = { x: 9 * TILE_SIZE + 4, y: 9 * TILE_SIZE + 4 };
+	await clickWorld(page, gatePoint.x, gatePoint.y);
 	await expect(page.getByTestId("slot-hotbar-4")).toHaveAttribute(
 		"data-count",
 		"1",
 	);
 
-	// The player spawns within reach of this gate, so its prompt appears at once.
+	// The player spawns within reach of this corner, so its prompt appears at once.
 	await expect(page.getByTestId("travel-prompt")).toContainText("open gate");
 	await page.keyboard.press("e");
 	await expect(page.getByTestId("travel-prompt")).toContainText("close gate");
 
 	await page.keyboard.press("7");
-	await clickFarmTile(page, 8, 8);
+	await clickWorld(page, gatePoint.x, gatePoint.y);
 	await expect(page.getByTestId("slot-hotbar-4")).toHaveAttribute(
 		"data-count",
 		"2",
