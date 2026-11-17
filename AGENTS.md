@@ -30,7 +30,8 @@ something new.
    `shared/` is shared across the frontend, **not** importable by Elixir.
 5. **Never commit generated or secret files.** No `.env`, SQLite files,
    `backend/priv/static`, `node_modules`, logs, or build output.
-   `scripts/repo-sanity.mjs` enforces this.
+   `scripts/repo-sanity.mjs` enforces this. The one size exception is `.mp4`
+   assets, which may be up to 50 MB; every other file stays under 1 MB.
 6. **Do not rename or remove `data-testid` values casually.** Playwright relies
    on them heavily. Add new ones when adding UI.
 7. **Do not edit old migrations.** Add a new timestamped migration; migrations
@@ -186,6 +187,11 @@ Production / e2e
   - `/dashboard` → `RequireAuth` + `Dashboard` (lobby: players, farms, visit)
 - `RequireAuth` resolves the session before rendering, and redirects to `/` if
   unauthenticated.
+- A successful **registration** keeps the page on `/login` with a "check your
+  email" notice. The emailed link opens `/verify?token=…`; verifying signs the
+  account in and shows `AccountCreatedDialog` (a canvas-keyed clip from
+  `public/assets/video/account-created.mp4`), and only **Continue** enters the
+  new account's farm at `/world`. Signing in still goes straight to `/`.
 - `useSession` calls `fetchMe()` once and returns `{ready, signedIn}`.
 
 ### 5.3 Backend supervision tree
@@ -483,8 +489,9 @@ single-use token machinery backs both email verification and password reset.
   token is a GitHub secret written to `~/grange.env` by `deploy/deploy.sh`.
   Links use `:app_url` (`APP_URL`, else `https://<PHX_HOST>`).
 - Client flow: `/login` registers then shows a "check your email" notice; the
-  emailed link opens `/verify?token=…`. `/forgot` requests a reset and
-  `/reset?token=…` sets a new password.
+  emailed link opens `/verify?token=…`, which signs the account in and shows
+  the Account Created celebration before Continue opens `/world`. `/forgot`
+  requests a reset and `/reset?token=…` sets a new password.
 - e2e read the links back through the dev-only `GET /api/auth/mailbox` route
   (console mailer) via helpers in `e2e/support/auth.ts`; `playwright.config.ts`
   pins `GRANGE_MAILER=console` so a developer's real `.env` doesn't force
@@ -997,8 +1004,10 @@ reason (the repo already has one for a deliberate hook dependency).
   Tests do **not** reset the server themselves: they register a unique account
   (`uniqueName`) instead, which is what lets the suite run in parallel.
 - Use `registerFast` (auth API + `goto`) unless the test is about the login
-  form itself; only `auth.spec.ts` drives the UI registration flow
-  (`registerAccount` / `register`).
+  form itself; only `auth.spec.ts` and `email.spec.ts` drive the UI
+  registration flow (`registerAccount` / `register`). Those helpers verify the
+  emailed link, dismiss the Account Created dialog, and wait for the new farm
+  at `/world`.
 - **Deep-link into the scene under test.** `registerFast(page, name, { area:
   "casino" })` boots `/world?area=casino` instead of walking there. The real
   navigation loop is covered once, in `journey.spec.ts`; feature specs should
@@ -1032,6 +1041,16 @@ reason (the repo already has one for a deliberate hook dependency).
   active, so a world that boots into a hub is ready too.
 - Tile interactions use `clickFarmTile` / `hoverFarmTile`, which map tile
   coordinates to page pixels using `MAP_COLUMNS`/`MAP_ROWS`.
+- `clickFarmTile` walks the player into reach first (farm tools are reach-gated
+  at `MAX_INTERACTION_DISTANCE`). To click a prop, use `movePlayerIntoReach`
+  instead: a prop's center sits inside its obstacle footprint, so the walk can
+  never reach it exactly and would otherwise press into the obstacle until the
+  walk budget runs out. `movePlayerNear` runs its whole loop inside the page,
+  watching the published player position and releasing the keys on the frame
+  it arrives (a wire-delayed release lands late enough to step past the target
+  when a starved runner only manages a couple of frames a second), and it
+  gives up once the player is within `reach` and has stopped closing the
+  distance. Its default budget is 10s, not the old 20s.
 - Walking tests use `walkUntilPrompt` and the `travel-prompt` testid. Use
   `holdKeys` only for short geometry legs between prompts, never as a
   stand-in for "walk until the prompt appears".
@@ -1064,7 +1083,8 @@ reason (the repo already has one for a deliberate hook dependency).
   because the runner has 4 vCPUs. A faster local machine started at its own core
   count just saturates the CPU and makes every walk slower than it is with two;
   raise `E2E_WORKERS` to experiment. The per-test timeout is 90s (the longest
-  paths, like the casino, set their own larger budget).
+  paths, like the casino, set their own larger budget; the heaviest farm specs
+  use `test.setTimeout(150_000)`).
 
 ### 10.4 CI
 

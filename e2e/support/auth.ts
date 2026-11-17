@@ -66,7 +66,8 @@ export async function enterFarm(page: Page): Promise<void> {
 }
 
 /**
- * Registers a fresh account and leaves the page on the main menu, signed in.
+ * Registers a fresh account, verifies it through the emailed link, dismisses
+ * the celebration box, and leaves the page on the new account's farm.
  * `/api/reset` wipes accounts too, so the username only has to be unique
  * within a test.
  */
@@ -85,25 +86,25 @@ export async function registerAccount(
 	await page.getByTestId("auth-notice").waitFor();
 
 	// Signup issues no session: open the emailed link the console mailer kept.
+	// Verifying signs the account in and celebrates before the farm opens.
 	const token = tokenFrom(await mailboxFor(email), "/verify");
 	await page.goto(`${BASE}/verify?token=${encodeURIComponent(token)}`);
-	await page.waitForURL(`${BASE}/`);
-	await page.getByTestId("menu-user").waitFor();
+	await page.getByTestId("account-created-continue").click();
+	await page.waitForURL("**/world");
+	await waitForWorld(page);
 	return username;
 }
 
 /**
- * Registers a fresh account and continues into the farm, leaving the page on
- * the farm map. Most tests start here.
+ * Registers a fresh account and leaves the page on its farm map. Most tests
+ * start here.
  */
 export async function register(
 	page: Page,
 	username: string,
 	password = TEST_PASSWORD,
 ): Promise<string> {
-	await registerAccount(page, username, password);
-	await enterFarm(page);
-	return username;
+	return registerAccount(page, username, password);
 }
 
 export interface RegisterFastOptions {
@@ -160,8 +161,10 @@ export async function login(
 	password = TEST_PASSWORD,
 ): Promise<void> {
 	await registerAccount(page, username, password);
-	// Sign out from the menu, then sign back in from the login screen.
-	await page.getByTestId("menu-logout").click();
+	// Sign out from the pause menu, then sign back in from the login screen.
+	await page.keyboard.press("Escape");
+	await page.getByTestId("logout").click();
+	await page.waitForURL(`${BASE}/`);
 	await page.getByTestId("menu-login").click();
 	await page.waitForURL("**/login");
 	await page.getByTestId("username").fill(username);
