@@ -1,8 +1,16 @@
 import type * as ex from "excalibur";
+import { useInventoryStore } from "../inventory/inventoryStore";
 import type { InputManager } from "./InputManager";
-import { FARM_HOUSE_REACH, isNearFarmTrain } from "./mapData";
+import {
+	FARM_HOUSE_REACH,
+	isNearFarmTrain,
+	isNearFarmTrainCart,
+} from "./mapData";
 import type { TrainController } from "./train";
 import type { WorldArea } from "./WalkingScene";
+
+const BOARD_PROMPT = "Press E or Enter to board the train";
+const CARGO_HINT = " · C to load the train";
 
 interface ScenePosition {
 	x: number;
@@ -16,6 +24,7 @@ export class FarmTravel {
 		private readonly onPromptChange: (prompt: string | null) => void,
 		private readonly onAreaChange: (area: WorldArea) => void,
 		private readonly onOpenMenu: () => void,
+		private readonly isOwner: boolean,
 	) {}
 
 	/**
@@ -49,7 +58,7 @@ export class FarmTravel {
 		housePrompt: string | null = null,
 		onOpenHouse: (() => void) | null = null,
 	): void {
-		// A nearby gate owns the prompt and the E key while it is in range.
+		// A nearby gate or barn owns the prompt and the E key while in range.
 		if (gatePrompt) {
 			this.setPrompt(gatePrompt);
 			return;
@@ -66,13 +75,27 @@ export class FarmTravel {
 			if (input.consumePress("KeyE", "Enter")) onOpenHouse();
 			return;
 		}
-		const canBoard =
-			isNearFarmTrain(player.pos.x, player.pos.y) && train.canBoard();
-		this.setPrompt(canBoard ? "Press E or Enter to board the train" : null);
-		if (!canBoard) return;
-		if (!input.consumePress("KeyE", "Enter")) return;
+		// Boarding works anywhere on the train; at the cart end the owner can
+		// also press C to open the cargo window. Splitting the key keeps the
+		// walk-up-and-board flow unchanged while cargo stays reachable.
+		if (isNearFarmTrain(player.pos.x, player.pos.y) && train.canBoard()) {
+			const atCarts =
+				this.isOwner &&
+				isNearFarmTrainCart(player.pos.x, player.pos.y);
+			this.setPrompt(atCarts ? BOARD_PROMPT + CARGO_HINT : BOARD_PROMPT);
+			if (input.consumePress("KeyE", "Enter")) {
+				this.setPrompt(null);
+				this.onOpenMenu();
+				return;
+			}
+			if (atCarts && input.consumePress("KeyC")) {
+				this.setPrompt(null);
+				useInventoryStore.getState().setTrainCargoOpen(true);
+				return;
+			}
+			return;
+		}
 		this.setPrompt(null);
-		this.onOpenMenu();
 	}
 
 	deactivate(): void {

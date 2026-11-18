@@ -13,6 +13,7 @@ import {
 	MARKETPLACE_PRODUCE_MARKET_ENTRANCE,
 	MARKETPLACE_ROWS,
 	MARKETPLACE_SEED_MARKET_ENTRANCE,
+	MARKETPLACE_TRAIN_DEPOT,
 	MARKETPLACE_TRAIN_STOP,
 	MARKETPLACE_WIDTH,
 	marketplaceProps,
@@ -23,6 +24,7 @@ import { TILE_SIZE } from "./mapData";
 import { marketplaceWalkObstacles } from "./sceneObstacles";
 import { addProps, addTerrain } from "./sceneRendering";
 import { findTrainRest, TrainController } from "./train";
+import { farmTrainOptions } from "./trainOptions";
 import {
 	type SceneActivationData,
 	WalkingScene,
@@ -37,6 +39,7 @@ export class MarketplaceScene extends WalkingScene {
 		onAreaChange: (area: WorldArea) => void,
 		onOpenMarket: (market: MarketId) => void,
 		onOpenTravel: () => void,
+		onPlayerPosition: (position: { x: number; y: number }) => void,
 	) {
 		super({
 			area: "Marketplace",
@@ -52,6 +55,12 @@ export class MarketplaceScene extends WalkingScene {
 					prompt: "Press E or Enter to board the train",
 					canInteract: () => this.train?.canBoard() ?? false,
 					action: onOpenTravel,
+				},
+				{
+					position: ex.vec(MARKETPLACE_TRAIN_DEPOT.x, MARKETPLACE_TRAIN_DEPOT.y),
+					prompt: "Press E or Enter to visit the train depot",
+					radius: 100,
+					action: () => onOpenMarket("train-depot"),
 				},
 				{
 					position: ex.vec(MARKETPLACE_BANK_ENTRANCE.x, MARKETPLACE_BANK_ENTRANCE.y),
@@ -107,6 +116,7 @@ export class MarketplaceScene extends WalkingScene {
 			],
 			onAreaChange,
 			onPromptChange,
+			onPlayerPosition,
 		});
 	}
 
@@ -121,7 +131,11 @@ export class MarketplaceScene extends WalkingScene {
 			MARKETPLACE_MIN_ROW,
 		);
 		addProps(this, marketplaceProps, marketplaceImages);
-		this.train = new TrainController(findTrainRest(marketplaceProps), this);
+		this.train = new TrainController(
+			findTrainRest(marketplaceProps),
+			this,
+			farmTrainOptions(),
+		);
 		this.addPlayer();
 	}
 

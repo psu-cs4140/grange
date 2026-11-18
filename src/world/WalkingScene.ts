@@ -79,6 +79,9 @@ interface WalkingSceneOptions {
 	hubArea?: HubArea | null;
 	onAreaChange: (area: WorldArea) => void;
 	onPromptChange: (prompt: string | null) => void;
+	/** Reports the local player's world position as it moves (throttled), so
+	 * the page can expose it to tests and tooling. */
+	onPlayerPosition?: (position: { x: number; y: number }) => void;
 	/** Right edge of the walkable world; omit for the default map width. */
 	worldWidth?: number;
 	/** Top edge and bottom edge of the walkable world. */
@@ -96,6 +99,8 @@ export abstract class WalkingScene extends ex.Scene<SceneActivationData> {
 	private hubPlayers?: HubPlayers;
 	private bonkFx?: BonkFx;
 	private readonly playerSpeed = 160;
+	/** Last world position sent to `onPlayerPosition`, for move-throttling. */
+	private lastReportedPos: ex.Vector | null = null;
 	/** Wall-clock gameplay step; see `frameClock.ts`. */
 	protected readonly frameClock = new FrameClock();
 
@@ -147,6 +152,8 @@ export abstract class WalkingScene extends ex.Scene<SceneActivationData> {
 		this.frameClock.reset();
 		this.options.onAreaChange(this.options.area);
 		this.setPrompt(null);
+		this.lastReportedPos = null;
+		this.reportPosition();
 		if (this.options.hubArea) {
 			joinHub(this.options.hubArea);
 			this.hubPlayers?.sync(getHubPeers());
@@ -231,6 +238,7 @@ export abstract class WalkingScene extends ex.Scene<SceneActivationData> {
 			);
 		}
 		updateFarmerGraphics(this.player, direction);
+		this.reportPosition();
 		if (this.options.hubArea) {
 			publishHubPosition(this.player.pos.x, this.player.pos.y);
 		}
@@ -252,6 +260,16 @@ export abstract class WalkingScene extends ex.Scene<SceneActivationData> {
 			this.traveling = true;
 			void this.travelTo(engine, interaction);
 		}
+	}
+
+	/** Reports the player's position when it has moved far enough to matter. */
+	private reportPosition(): void {
+		const report = this.options.onPlayerPosition;
+		if (!report) return;
+		const last = this.lastReportedPos;
+		if (last && last.distance(this.player.pos) < 12) return;
+		this.lastReportedPos = this.player.pos.clone();
+		report({ x: this.player.pos.x, y: this.player.pos.y });
 	}
 
 	/** Plays any pre-travel animation, then hands off to the destination scene. */
