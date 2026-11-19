@@ -1,29 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MIN_BET } from "./blackjack";
 import { BlackjackTable } from "./blackjackGame";
-import type { Bank, BlackjackSnapshot, HandResult } from "./blackjackTypes";
+import { RESULT_LABEL, totalLabel } from "./blackjackDisplay";
+import type { Bank, BlackjackSnapshot } from "./blackjackTypes";
 import { buildDealerSlots, cardCode } from "./cardSlots";
 import { Deck } from "./Deck";
 import { economy } from "./EconomyManager";
 import { PlayingCard } from "./PlayingCard";
+import { type BlackjackMove, useCardTableServer } from "./useBlackjackServer";
 import "./blackjack.css";
 
-const RESULT_LABEL: Record<HandResult, string> = {
-	blackjack: "Blackjack",
-	win: "Win",
-	push: "Push",
-	lose: "Lose",
-	bust: "Bust",
-	surrender: "Surrender",
-};
-
 const CHIPS = [5, 25, 100];
-
-function totalLabel(total: number, soft: boolean): string {
-	if (total > 21) return `${total} (bust)`;
-	if (soft && total !== 21) return `${total} (soft)`;
-	return String(total);
-}
 
 interface BlackjackOverlayProps {
 	onClose: () => void;
@@ -41,9 +28,13 @@ export function BlackjackOverlay({ onClose }: BlackjackOverlayProps) {
 		[],
 	);
 	const [table] = useState(() => new BlackjackTable(bank));
-	const [snapshot, setSnapshot] = useState<BlackjackSnapshot>(() =>
+	const [localSnapshot, setSnapshot] = useState<BlackjackSnapshot>(() =>
 		table.snapshot(),
 	);
+	const remote = !economy.isAdmin();
+	const server = useCardTableServer<BlackjackSnapshot>("blackjack", remote);
+	const [nextRound, setNextRound] = useState(false);
+	const snapshot = server.snapshot ?? localSnapshot;
 	const [betInput, setBetInput] = useState(() => String(table.snapshot().bet));
 
 	const deckRef = useRef<HTMLDivElement>(null);
@@ -90,17 +81,36 @@ export function BlackjackOverlay({ onClose }: BlackjackOverlayProps) {
 	};
 
 	const playAgain = () => {
+		if (remote) {
+			setNextRound(true);
+			return;
+		}
 		table.newRound();
 		setBetInput(String(table.snapshot().bet));
 		refresh();
 	};
 
 	const active = snapshot.phase === "playerTurn";
-	const betting = snapshot.phase === "betting";
+	const betting = snapshot.phase === "betting" || nextRound;
+	const wager = Math.floor(Number(betInput));
+	const betError = remote
+		? Number.isSafeInteger(wager) && wager >= MIN_BET && wager <= snapshot.balance
+			? null
+			: "Enter an affordable bet."
+		: snapshot.betError;
+
+	const act = async (move: BlackjackMove, bet?: number) => {
+		if (remote) {
+			if (await server.act(move, bet)) setNextRound(false);
+		} else {
+			run(() => table[move]());
+		}
+	};
 
 	return (
 		<div className="bj-overlay" data-testid="blackjack-overlay">
 			<div className="bj-panel" role="dialog" aria-label="Blackjack table">
+				{server.error && <p role="alert">{server.error}</p>}
 				<header className="bj-header">
 					<h2 className="bj-title">Blackjack</h2>
 					<span className="bj-balance" data-testid="blackjack-balance">
@@ -218,17 +228,17 @@ export function BlackjackOverlay({ onClose }: BlackjackOverlayProps) {
 								onChange={(event) => onBetChange(event.target.value)}
 							/>
 						</label>
-						{snapshot.betError && (
+						{betError && (
 							<span className="bj-error" data-testid="blackjack-bet-error">
-								{snapshot.betError}
+								{betError}
 							</span>
 						)}
 						<button
 							type="button"
 							className="bj-action bj-primary"
 							data-testid="blackjack-deal"
-							disabled={snapshot.betError !== null}
-							onClick={() => run(() => table.deal())}
+							disabled={betError !== null || server.busy || (remote && !server.snapshot)}
+							onClick={() => void act("deal", wager)}
 						>
 							Deal
 						</button>
@@ -242,7 +252,7 @@ export function BlackjackOverlay({ onClose }: BlackjackOverlayProps) {
 							className="bj-action"
 							data-testid="blackjack-hit"
 							disabled={!snapshot.canHit}
-							onClick={() => run(() => table.hit())}
+							onClick={() => void act("hit")}
 						>
 							Hit
 						</button>
@@ -251,7 +261,7 @@ export function BlackjackOverlay({ onClose }: BlackjackOverlayProps) {
 							className="bj-action"
 							data-testid="blackjack-stand"
 							disabled={!snapshot.canStand}
-							onClick={() => run(() => table.stand())}
+							onClick={() => void act("stand")}
 						>
 							Stand
 						</button>
@@ -260,7 +270,7 @@ export function BlackjackOverlay({ onClose }: BlackjackOverlayProps) {
 							className="bj-action"
 							data-testid="blackjack-double"
 							disabled={!snapshot.canDouble}
-							onClick={() => run(() => table.double())}
+							onClick={() => void act("double")}
 						>
 							Double
 						</button>
@@ -269,7 +279,7 @@ export function BlackjackOverlay({ onClose }: BlackjackOverlayProps) {
 							className="bj-action"
 							data-testid="blackjack-split"
 							disabled={!snapshot.canSplit}
-							onClick={() => run(() => table.split())}
+							onClick={() => void act("split")}
 						>
 							Split
 						</button>
@@ -278,14 +288,14 @@ export function BlackjackOverlay({ onClose }: BlackjackOverlayProps) {
 							className="bj-action"
 							data-testid="blackjack-forfeit"
 							disabled={!snapshot.canSurrender}
-							onClick={() => run(() => table.surrender())}
+							onClick={() => void act("surrender")}
 						>
 							Forfeit
 						</button>
 					</div>
 				)}
 
-				{snapshot.phase === "settled" && (
+			{snapshot.phase === "settled" && !nextRound && (
 					<div className="bj-actions">
 						<button
 							type="button"

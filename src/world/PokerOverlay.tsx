@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Bank } from "./blackjackTypes";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { cardCode } from "./cardSlots";
 import { Deck } from "./Deck";
 import { economy } from "./EconomyManager";
@@ -7,6 +6,7 @@ import { PlayingCard } from "./PlayingCard";
 import { type HandCategory, CATEGORY_LABEL } from "./pokerHand";
 import { PokerTable } from "./pokerGame";
 import type { PokerSnapshot } from "./pokerTypes";
+import { adminPokerBank, type PokerMove, useCardTableServer } from "./useBlackjackServer";
 import "./blackjack.css";
 import "./poker.css";
 
@@ -22,20 +22,13 @@ function bestLabel(category: HandCategory | null): string {
 }
 
 export function PokerOverlay({ onClose }: PokerOverlayProps) {
-	const bank = useMemo<Bank>(
-		() => ({
-			getBalance: () => economy.getBalance(),
-			withdraw: (amount) => economy.withdrawChips(amount),
-			deposit: (amount) => {
-				economy.depositChips(amount);
-			},
-		}),
-		[],
-	);
-	const [table] = useState(() => new PokerTable(bank));
-	const [snapshot, setSnapshot] = useState<PokerSnapshot>(() =>
+	const [table] = useState(() => new PokerTable(adminPokerBank));
+	const [localSnapshot, setSnapshot] = useState<PokerSnapshot>(() =>
 		table.snapshot(),
 	);
+	const remote = !economy.isAdmin();
+	const server = useCardTableServer<PokerSnapshot>("poker", remote);
+	const snapshot = server.snapshot ?? localSnapshot;
 	const [raiseTo, setRaiseTo] = useState(0);
 
 	const deckRef = useRef<HTMLDivElement>(null);
@@ -55,22 +48,25 @@ export function PokerOverlay({ onClose }: PokerOverlayProps) {
 		seen.current = new Set(codes);
 	});
 
-	const run = useCallback(
-		(action: () => void) => {
-			action();
-			setSnapshot(table.snapshot());
-		},
-		[table],
-	);
+	const run = (move: PokerMove, amount = 0) => {
+		if (remote) {
+			void server.act(move, amount);
+			return;
+		}
+		if (move === "deal") table.startHand();
+		else if (move === "raise") table.raiseTo(amount);
+		else table[move]();
+		setSnapshot(table.snapshot());
+	};
 
-	// Walking away mid-hand settles it as a fold, so the pot is not silently
-	// abandoned with the player's committed chips still withdrawn.
+	// Public hands remain on the server when the player leaves the table.
 	const leave = useCallback(() => {
-		if (snapshot.phase === "playerTurn" || snapshot.phase === "dealerTurn") {
+		if (server.busy) return;
+		if (!remote && (snapshot.phase === "playerTurn" || snapshot.phase === "dealerTurn")) {
 			table.forfeit();
 		}
 		onClose();
-	}, [table, snapshot.phase, onClose]);
+	}, [table, snapshot.phase, onClose, remote, server.busy]);
 
 	useEffect(() => {
 		if (snapshot.phase === "playerTurn") setRaiseTo(snapshot.minRaiseTo);
@@ -99,6 +95,7 @@ export function PokerOverlay({ onClose }: PokerOverlayProps) {
 				role="dialog"
 				aria-label="Poker table"
 			>
+				{server.error && <p role="alert">{server.error}</p>}
 				<header className="bj-header">
 					<h2 className="bj-title">Texas Hold'em</h2>
 					<span className="pk-pot" data-testid="poker-pot">
@@ -206,7 +203,8 @@ export function PokerOverlay({ onClose }: PokerOverlayProps) {
 							type="button"
 							className="bj-action bj-primary"
 							data-testid="poker-deal"
-							onClick={() => run(() => table.startHand())}
+							disabled={remote && (!server.snapshot || server.busy)}
+							onClick={() => run("deal")}
 						>
 							{snapshot.phase === "settled" ? "Next hand" : "Deal"}
 						</button>
@@ -228,7 +226,7 @@ export function PokerOverlay({ onClose }: PokerOverlayProps) {
 								type="button"
 								className="bj-action"
 								data-testid="poker-fold"
-								onClick={() => run(() => table.fold())}
+								onClick={() => run("fold")}
 							>
 								Fold
 							</button>
@@ -237,7 +235,7 @@ export function PokerOverlay({ onClose }: PokerOverlayProps) {
 									type="button"
 									className="bj-action bj-primary"
 									data-testid="poker-check"
-									onClick={() => run(() => table.check())}
+									onClick={() => run("check")}
 								>
 									Check
 								</button>
@@ -246,7 +244,7 @@ export function PokerOverlay({ onClose }: PokerOverlayProps) {
 									type="button"
 									className="bj-action bj-primary"
 									data-testid="poker-call"
-									onClick={() => run(() => table.call())}
+									onClick={() => run("call")}
 								>
 									Call ${snapshot.callAmount}
 								</button>
@@ -306,7 +304,7 @@ export function PokerOverlay({ onClose }: PokerOverlayProps) {
 									type="button"
 									className="bj-action bj-primary"
 									data-testid="poker-raise"
-									onClick={() => run(() => table.raiseTo(raiseTo))}
+									onClick={() => run("raise", raiseTo)}
 								>
 									Raise to ${raiseTo}
 								</button>

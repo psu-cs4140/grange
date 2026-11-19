@@ -27,6 +27,12 @@ defmodule GrangeWeb.Router do
     post("/auth/reset-password", AuthController, :reset_password)
 
     post("/economy/transaction", EconomyController, :transaction)
+    post("/casino/slots/spin", EconomyController, :spin_slots)
+    post("/casino/roulette/spin", EconomyController, :spin_roulette)
+    get("/casino/blackjack", EconomyController, :blackjack)
+    post("/casino/blackjack", EconomyController, :blackjack_action)
+    get("/casino/poker", EconomyController, :poker)
+    post("/casino/poker", EconomyController, :poker_action)
     post("/livestock/buy", LivestockController, :buy)
     get("/bank/balance", BankController, :balance)
     post("/bank/transfer", BankController, :transfer)
@@ -46,6 +52,7 @@ defmodule GrangeWeb.Router do
     if Application.compile_env(:grange, :enable_test_routes, false) do
       post("/reset", HealthController, :reset)
       post("/dev/npc", DevController, :npc)
+      post("/dev/fund-wallet", DevController, :fund_wallet)
       get("/auth/mailbox", AuthController, :mailbox)
     end
   end

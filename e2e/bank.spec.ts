@@ -59,9 +59,10 @@ test("the final land parcel is walkable and farmable to the map border", async (
 		await page.keyboard.up("w");
 	}
 
-	await page.request.post(`${BASE}/api/economy/transaction`, {
-		data: { delta: 10_000 },
+	const funded = await page.request.post(`${BASE}/api/dev/fund-wallet`, {
+		data: { amount: 10_000 },
 	});
+	expect(funded.ok()).toBeTruthy();
 	for (let level = 1; level <= 5; level += 1) {
 		const response = await page.request.post(`${BASE}/api/land/buy`, {
 			data: {},
