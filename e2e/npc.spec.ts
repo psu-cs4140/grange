@@ -83,7 +83,7 @@ test("farmhand walks the player through tomatoes, supplies, and farewell", async
 	// Ten tomatoes in the barn unlock the batch at market price.
 	await seedNpc(page, { stage: "tomatoes", barn: { tomato: 10 } });
 	await expect(page.getByTestId("npc-sell-tomato")).toBeEnabled();
-	await expect(page.getByTestId("npc-sell-tomato")).toContainText("50 GC");
+	await expect(page.getByTestId("npc-sell-tomato")).toContainText("150 GC");
 
 	const balance = page.getByTestId("npc-balance");
 	await expect(balance).toContainText("100 GC");
@@ -95,7 +95,7 @@ test("farmhand walks the player through tomatoes, supplies, and farewell", async
 	await expect(page.getByTestId("npc-dialogue")).toContainText(
 		"Thank you kindly",
 	);
-	await expect(balance).toContainText("150 GC");
+	await expect(balance).toContainText("250 GC");
 	await expect(page.getByTestId("npc-buy-lettuce")).toHaveCount(0);
 
 	await page.getByTestId("npc-thanks-continue").click();
@@ -114,7 +114,7 @@ test("farmhand walks the player through tomatoes, supplies, and farewell", async
 	await expect(page.getByTestId("npc-message")).toContainText(
 		"Bought 10 lettuce seeds",
 	);
-	await expect(balance).toContainText("110 GC");
+	await expect(balance).toContainText("190 GC");
 
 	// Hand in both ten-crop batches one at a time.
 	await seedNpc(page, {
