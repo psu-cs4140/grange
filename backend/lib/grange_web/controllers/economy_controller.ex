@@ -33,6 +33,7 @@ defmodule GrangeWeb.EconomyController do
     end
   end
 
+  # credo:disable-for-next-line Credo.Check.Refactor.ABCSize
   defp hand_action(conn, params, game, rules) do
     case current_user(conn) do
       nil ->

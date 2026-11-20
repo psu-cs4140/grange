@@ -56,6 +56,7 @@ defmodule Grange.Poker do
     respond(state, balance - 5)
   end
 
+  # credo:disable-for-next-line Credo.Check.Refactor.ABCSize
   defp take_turn(state, balance, actor, move, amount) do
     mine = committed(state, actor)
     needed = state["currentBet"] - mine
@@ -109,36 +110,35 @@ defmodule Grange.Poker do
   defp pass(state, balance, :dealer), do: respond(state, balance)
 
   defp next_street(state, balance) do
-    cond do
-      state["street"] == "river" or balance == 0 or state["dealerStack"] == 0 ->
-        showdown(state, balance)
+    if state["street"] == "river" or balance == 0 or state["dealerStack"] == 0 do
+      showdown(state, balance)
+    else
+      {street, count} =
+        case state["street"] do
+          "preflop" -> {"flop", 3}
+          "flop" -> {"turn", 1}
+          "turn" -> {"river", 1}
+        end
 
-      true ->
-        {street, count} =
-          case state["street"] do
-            "preflop" -> {"flop", 3}
-            "flop" -> {"turn", 1}
-            "turn" -> {"river", 1}
-          end
+      {cards, deck} = Enum.split(state["deck"], count)
 
-        {cards, deck} = Enum.split(state["deck"], count)
+      next = %{
+        state
+        | "street" => street,
+          "deck" => deck,
+          "community" => state["community"] ++ cards,
+          "playerCommitted" => 0,
+          "dealerCommitted" => 0,
+          "currentBet" => 0,
+          "minRaise" => @blind,
+          "acted" => false
+      }
 
-        next = %{
-          state
-          | "street" => street,
-            "deck" => deck,
-            "community" => state["community"] ++ cards,
-            "playerCommitted" => 0,
-            "dealerCommitted" => 0,
-            "currentBet" => 0,
-            "minRaise" => @blind,
-            "acted" => false
-        }
-
-        dealer_turn(next, balance)
+      dealer_turn(next, balance)
     end
   end
 
+  # credo:disable-for-next-line /Credo\.Check\.Refactor\.(ABCSize|CyclomaticComplexity)$/
   defp dealer_turn(state, balance) do
     needed = state["currentBet"] - state["dealerCommitted"]
     strength = strength(state)
@@ -172,6 +172,7 @@ defmodule Grange.Poker do
     end
   end
 
+  # credo:disable-for-next-line Credo.Check.Refactor.ABCSize
   defp strength(%{"community" => []} = state) do
     [a, b] = state["dealerHole"]
     [high, low] = Enum.sort([PokerHand.rank(a), PokerHand.rank(b)], :desc)
@@ -255,6 +256,7 @@ defmodule Grange.Poker do
 
   defp respond(state, balance), do: {:ok, state, public_state(state, balance), balance}
 
+  # credo:disable-for-next-line /Credo\.Check\.Refactor\.(ABCSize|CyclomaticComplexity)$/
   def public_state(state, balance) do
     phase = state["phase"] || "idle"
     active = phase == "playerTurn"

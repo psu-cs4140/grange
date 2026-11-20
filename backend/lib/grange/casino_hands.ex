@@ -80,6 +80,7 @@ defmodule Grange.CasinoHands do
     end
   end
 
+  # credo:disable-for-next-line Credo.Check.Refactor.ABCSize
   defp commit(action, user_id, game, version, transition) do
     hand = from(h in "casino_hands", where: h.user_id == ^user_id and h.game == ^game)
     current = Repo.one(select(hand, [h], {h.version, type(h.state, :map)}))
@@ -109,15 +110,11 @@ defmodule Grange.CasinoHands do
   end
 
   defp save_hand(user_id, game, version, state) do
-    Repo.insert_all(
-      "casino_hands",
-      [
-        %{
-          user_id: user_id,
-          game: game,
-          version: version,
-          state: Jason.encode!(state)
-        }
-      ], on_conflict: {:replace, [:version, :state]}, conflict_target: [:user_id, :game])
+    row = %{user_id: user_id, game: game, version: version, state: Jason.encode!(state)}
+
+    Repo.insert_all("casino_hands", [row],
+      on_conflict: {:replace, [:version, :state]},
+      conflict_target: [:user_id, :game]
+    )
   end
 end

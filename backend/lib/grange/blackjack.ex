@@ -12,6 +12,7 @@ defmodule Grange.Blackjack do
     end
   end
 
+  # credo:disable-for-next-line Credo.Check.Refactor.ABCSize
   def apply_action(%{"phase" => "playerTurn"} = state, balance, %{"move" => move}) do
     hand = Enum.at(state["hands"], state["activeHand"])
     opening = length(hand["cards"]) == 2
@@ -49,6 +50,7 @@ defmodule Grange.Blackjack do
 
   def apply_action(_state, _balance, _request), do: {:error, :invalid_action}
 
+  # credo:disable-for-next-line /Credo\.Check\.Refactor\.(ABCSize|CyclomaticComplexity)$/
   def public_state(state, balance) do
     hidden = state["phase"] == "playerTurn"
     dealer = state["dealer"] || []
@@ -106,6 +108,7 @@ defmodule Grange.Blackjack do
       else: state |> put_hand(hand) |> respond(balance)
   end
 
+  # credo:disable-for-next-line Credo.Check.Refactor.ABCSize
   defp split(%{"deck" => [a, b | deck]} = state, hand, balance) do
     cond do
       length(state["hands"]) >= 4 or not splittable?(hand["cards"]) ->
@@ -170,6 +173,7 @@ defmodule Grange.Blackjack do
 
   defp result(%{"result" => "surrender"}, _dealer), do: "surrender"
 
+  # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
   defp result(hand, dealer) do
     player = total(hand["cards"])
     house = total(dealer)

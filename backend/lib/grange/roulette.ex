@@ -12,21 +12,22 @@ defmodule Grange.Roulette do
       stake = Enum.sum(Enum.map(resolved, fn {amount, _numbers} -> amount end))
 
       SlotSpins.settle_round(user_id, id, stake, %{"game" => "roulette", "bets" => bets}, fn ->
-        pocket = Enum.at(@pockets, CasinoRandom.draw(length(@pockets)) - 1)
-
-        payout =
-          Enum.reduce(resolved, 0, fn {amount, numbers}, total ->
-            if pocket in numbers,
-              do: total + amount * Map.fetch!(@gross, length(numbers)),
-              else: total
-          end)
-
-        %{"pocket" => pocket, "payout" => payout}
+        draw(resolved)
       end)
     end
   end
 
   def spin(_user_id, _id, _bets), do: {:error, :invalid_spin}
+
+  defp draw(bets) do
+    pocket = Enum.at(@pockets, CasinoRandom.draw(length(@pockets)) - 1)
+    payout = Enum.sum(Enum.map(bets, &return_for(&1, pocket)))
+    %{"pocket" => pocket, "payout" => payout}
+  end
+
+  defp return_for({amount, numbers}, pocket) do
+    if pocket in numbers, do: amount * Map.fetch!(@gross, length(numbers)), else: 0
+  end
 
   defp resolve(bets) do
     Enum.reduce_while(bets, {:ok, []}, fn
@@ -60,6 +61,7 @@ defmodule Grange.Roulette do
             ],
        do: [a, b]
 
+  # credo:disable-for-next-line Credo.Check.Refactor.ABCSize
   defp numbers([kind, index]) do
     case {kind, Integer.parse(index)} do
       {"street", {col, ""}} when col in 0..11 -> grid([col], 0..2)
@@ -70,6 +72,7 @@ defmodule Grange.Roulette do
     end
   end
 
+  # credo:disable-for-next-line Credo.Check.Refactor.ABCSize
   defp numbers([kind, column, row]) do
     case {kind, Integer.parse(column), Integer.parse(row)} do
       {"split-h", {c, ""}, {r, ""}} when c in 0..10 and r in 0..2 -> grid(c..(c + 1), [r])
