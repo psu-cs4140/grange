@@ -72,9 +72,9 @@ jobs:
         # Playwright directly instead of rebuilding via `test:e2e`.
         run: pnpm test:e2e:run
         env:
-          # The larger farm/marketplace scenes need the runner to itself; even
-          # two workers drop clicks/keys in movement-heavy specs.
-          E2E_WORKERS: 1
+          # Two workers keeps the canvas-heavy walks reliable on the runner;
+          # more parallelism just starves the frame loop.
+          E2E_WORKERS: 2
 
       - name: Upload Playwright report
         if: ${{ !cancelled() }}

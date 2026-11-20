@@ -1,8 +1,19 @@
 import * as ex from "excalibur";
 import { depthForY } from "./depth";
-import { addFarmerGraphics } from "./farmerSprite";
-import { FARM_PLAYER_SPAWN, farmBounds, MAP_HEIGHT, MAP_WIDTH, TILE_SIZE } from "./mapData";
+import { addFarmerGraphics, updateFarmerGraphics } from "./farmerSprite";
+import type { HorseRiding } from "./horseRiding";
+import type { InputManager, InputVector } from "./InputManager";
+import type { LandBorderHint } from "./landBorder";
+import {
+	FARM_PLAYER_SPAWN,
+	farmBounds,
+	MAP_HEIGHT,
+	MAP_WIDTH,
+	TILE_SIZE,
+} from "./mapData";
+import { updateFarmPlayer } from "./playerMovement";
 import { cameraAxis } from "./viewport";
+import { publishViewTransform } from "./viewTransform";
 
 export function createFarmPlayer(scene: ex.Scene): ex.Actor {
 	const player = new ex.Actor({
@@ -15,6 +26,45 @@ export function createFarmPlayer(scene: ex.Scene): ex.Actor {
 	addFarmerGraphics(player);
 	scene.add(player);
 	return player;
+}
+
+/** Stops the farmer and swallows an interact press while an overlay owns input. */
+export function freezeFarmPlayer(player: ex.Actor, input: InputManager): void {
+	player.vel = ex.vec(0, 0);
+	updateFarmerGraphics(player, { x: 0, y: 0 });
+	input.consumePress("KeyE", "Enter");
+}
+
+/**
+ * Moves the farmer (or their horse), follows with the camera, and reports the
+ * throttled HUD position. One call per frame keeps the scene's update small.
+ */
+export function moveFarmPlayer(
+	player: ex.Actor,
+	camera: ex.Camera,
+	engine: ex.Engine,
+	riding: HorseRiding,
+	direction: InputVector,
+	step: number,
+	speedMultiplier: number,
+	landLevel: number,
+	landHint: LandBorderHint,
+	trackPlayer: (pos: { x: number; y: number }) => void,
+): void {
+	if (!riding.ride(player, direction, step, speedMultiplier)) {
+		updateFarmPlayer(
+			player,
+			direction,
+			step,
+			speedMultiplier,
+			landLevel,
+			landHint,
+		);
+		updateFarmerGraphics(player, direction);
+	}
+	followFarmPlayer(camera, player.pos, landLevel, engine);
+	publishViewTransform(engine, camera);
+	trackPlayer(player.pos);
 }
 
 export function followFarmPlayer(
@@ -35,11 +85,6 @@ export function followFarmPlayer(
 			bounds.minColumn * TILE_SIZE,
 			(bounds.maxColumn + 1) * TILE_SIZE,
 		),
-		cameraAxis(
-			position.y,
-			halfHeight,
-			bounds.minRow * TILE_SIZE,
-			MAP_HEIGHT,
-		),
+		cameraAxis(position.y, halfHeight, bounds.minRow * TILE_SIZE, MAP_HEIGHT),
 	);
 }

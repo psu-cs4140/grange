@@ -4,11 +4,11 @@ import type { FarmBarn } from "./FarmBarn";
 import type { FarmTravel } from "./FarmTravel";
 import type { FarmFishing } from "./farmFishing";
 import type { FarmNpc } from "./farmNpc";
-import { npcAnchor, npcPrompt } from "./farmNpcPosition";
+import { npcPrompt } from "./farmNpcPosition";
 import type { FarmPropLayer } from "./farmPropLayer";
 import { nearbyGate, toggleGate } from "./gateInteraction";
+import type { HorseRiding } from "./horseRiding";
 import type { InputManager } from "./InputManager";
-import { shouldShowNpc } from "./npcStore";
 import type { TrainController } from "./train";
 
 export interface FarmInteractionArgs {
@@ -20,6 +20,7 @@ export interface FarmInteractionArgs {
 	travel: FarmTravel;
 	barn: FarmBarn;
 	fishing: FarmFishing;
+	riding: HorseRiding;
 	farmProps: FarmPropLayer;
 	farm: ActiveFarm | null;
 	npc?: FarmNpc;
@@ -28,12 +29,11 @@ export interface FarmInteractionArgs {
 	report: (text: string) => void;
 }
 
-/** Resolves the frame's gate, farmhand, house, barn, and fishing input. */
+/** Resolves the frame's gate, farmhand, house, barn, horse, and fishing input. */
 export function updateFarmInteractions(args: FarmInteractionArgs): void {
 	const gate = nearbyGate(args.farm?.gates ?? [], args.player.pos);
 	const house = args.farmProps.position("farmhouse");
-	const npc = shouldShowNpc(args.isOwner) ? npcAnchor(house) : null;
-	args.npc?.place(npc);
+	const npc = args.npc?.sync(args.isOwner, house) ?? null;
 	args.travel.update(
 		args.player,
 		args.input,
@@ -48,5 +48,6 @@ export function updateFarmInteractions(args: FarmInteractionArgs): void {
 		toggleGate(args.owner, gate.gate, args.report);
 	}
 	args.barn.update(args.player, args.input, args.farmProps);
+	args.riding.update(args.player, args.input);
 	args.fishing.update(args.player.pos.y, args.input);
 }

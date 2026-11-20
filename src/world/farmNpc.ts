@@ -1,7 +1,8 @@
 import * as ex from "excalibur";
 import { depthForY } from "./depth";
-import { FARM_NPC_NAME, type NpcAnchor } from "./farmNpcPosition";
+import { FARM_NPC_NAME, type NpcAnchor, npcAnchor } from "./farmNpcPosition";
 import { createNameLabel } from "./nameLabel";
+import { shouldShowNpc } from "./npcStore";
 
 export const FARM_NPC_WIDTH = 44;
 export const FARM_NPC_HEIGHT = 64;
@@ -42,6 +43,16 @@ export class FarmNpc {
 
 		scene.add(this.body);
 		scene.add(this.label);
+	}
+
+	/**
+	 * Places him from the live farmhouse position for the owner, or hides him
+	 * for visitors and finished quests. Returns his anchor for prompt checks.
+	 */
+	sync(isOwner: boolean, house: NpcAnchor | null): NpcAnchor | null {
+		const anchor = shouldShowNpc(isOwner) ? npcAnchor(house) : null;
+		this.place(anchor);
+		return anchor;
 	}
 
 	/** Moves him to `position`, or hides him when it is null. */

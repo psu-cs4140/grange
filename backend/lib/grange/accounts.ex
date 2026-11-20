@@ -295,11 +295,11 @@ defmodule Grange.Accounts do
 
   # Grants admin rights and tops the balance up to the admin floor. Promotion
   # only ever raises the balance, so promoting an account never takes money away.
-  # A password, when given, is rehashed and stored so the login is known.
+  # A password, when given, is rehashed and stored so the login is known. The
+  # account is marked verified because promotion is an operator action and the
+  # resulting admin must be able to sign in immediately.
   defp promote(user, password) do
     balance = max(user.balance, @admin_balance)
-    # An operator is the one running this, so the promoted login must be usable
-    # even though the account never confirmed its email.
     verified_at = user.email_verified_at || DateTime.utc_now()
 
     changes =
