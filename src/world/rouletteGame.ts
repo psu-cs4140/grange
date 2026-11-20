@@ -25,6 +25,7 @@ export class RouletteTable {
 	private phase: RoulettePhase = "betting";
 	private bets = new Map<string, PlacedBet>();
 	private result: PocketId | null = null;
+	private serverSettled = false;
 	private net = 0;
 	private message = "Place your bets.";
 
@@ -105,6 +106,13 @@ export class RouletteTable {
 		return true;
 	}
 
+	showServerSpin(result: PocketId): void {
+		this.serverSettled = true;
+		this.result = result;
+		this.phase = "spinning";
+		this.message = "Spinning…";
+	}
+
 	/** Resolves the round. Called once the wheel animation has finished. */
 	settle(): RouletteSnapshot {
 		if (this.phase !== "spinning" || this.result === null) {
@@ -117,7 +125,7 @@ export class RouletteTable {
 			bet.won = won;
 			bet.returned = won ? payoutFor(bet.amount, bet.kind) : 0;
 			if (won) {
-				this.bank.deposit(bet.returned);
+				if (!this.serverSettled) this.bank.deposit(bet.returned);
 				returned += bet.returned;
 			}
 		}
@@ -132,6 +140,7 @@ export class RouletteTable {
 		this.phase = "betting";
 		this.bets.clear();
 		this.result = null;
+		this.serverSettled = false;
 		this.net = 0;
 		this.message = "Place your bets.";
 	}

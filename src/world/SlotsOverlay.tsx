@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { economy } from "./EconomyManager";
-import { MAX_BET, SLOT_BETS, SLOT_SYMBOLS, symbolDef } from "./slots";
+import { MAX_BET, SLOT_BETS, SLOT_SYMBOLS, type SlotSymbol, symbolDef } from "./slots";
 import { SlotMachine } from "./slotsGame";
 import { SlotsReels } from "./SlotsReels";
 import type { Bank, SlotsSnapshot } from "./slotsTypes";
@@ -35,6 +35,10 @@ export function SlotsOverlay({ onClose }: SlotsOverlayProps) {
 	const [autoSpin, setAutoSpin] = useState(false);
 	const [spins, setSpins] = useState(0);
 	const sequenceProgress = useRef(0);
+	const pending = useRef<{ id: string; bet: number } | null>(null);
+	const sending = useRef(false);
+	const [awaitingSpin, setAwaitingSpin] = useState(false);
+	const [spinError, setSpinError] = useState("");
 
 	const refresh = useCallback(() => setSnapshot(machine.snapshot()), [machine]);
 
@@ -43,9 +47,51 @@ export function SlotsOverlay({ onClose }: SlotsOverlayProps) {
 	const settled = snapshot.phase === "settled";
 
 	/** Starts a fresh round and spins once, counting the spin. */
-	const spinAgain = useCallback(() => {
+	const spinAgain = useCallback(async () => {
+		if (sending.current) return;
 		machine.newRound();
-		if (machine.spin()) setSpins((count) => count + 1);
+		if (economy.isAdmin()) {
+			if (machine.spin()) setSpins((count) => count + 1);
+			setSnapshot(machine.snapshot());
+			return;
+		}
+		if (machine.snapshot().phase !== "betting") return;
+		const request = pending.current ?? {
+			id: crypto.randomUUID(),
+			bet: machine.snapshot().bet,
+		};
+		pending.current = request;
+		sending.current = true;
+		setAwaitingSpin(true);
+		setSpinError("");
+		try {
+			const response = await fetch("/api/casino/slots/spin", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ spin_id: request.id, bet: request.bet }),
+			});
+			if (!response.ok) {
+				if (response.status < 500) pending.current = null;
+				const failure = await response.json();
+				throw new Error(failure.error ?? "The spin could not be confirmed.");
+			}
+			const result = (await response.json()) as {
+				reels: SlotSymbol[];
+				payout: number;
+				balance: number;
+			};
+			machine.setBet(request.bet);
+			machine.showServerSpin(result.reels, result.payout);
+			economy.setBalance(result.balance);
+			pending.current = null;
+			setSpins((count) => count + 1);
+		} catch (error) {
+			setAutoSpin(false);
+			setSpinError(error instanceof Error ? error.message : "The spin could not be confirmed.");
+		} finally {
+			sending.current = false;
+			setAwaitingSpin(false);
+		}
 		setSnapshot(machine.snapshot());
 	}, [machine]);
 
@@ -72,9 +118,10 @@ export function SlotsOverlay({ onClose }: SlotsOverlayProps) {
 	useEffect(() => {
 		const onKey = (event: KeyboardEvent) => {
 			if (event.key === "Escape") {
-				if (!spinning) onClose();
+				if (!spinning && !sending.current) onClose();
 				return;
 			}
+			if (!economy.isAdmin()) return;
 			if (event.key === SPECIAL_SEQUENCE[sequenceProgress.current]) {
 				sequenceProgress.current += 1;
 				if (sequenceProgress.current === SPECIAL_SEQUENCE.length) {
@@ -90,14 +137,13 @@ export function SlotsOverlay({ onClose }: SlotsOverlayProps) {
 	}, [onClose, spinning, triggerJackpot]);
 
 	const chooseBet = (amount: number) => {
-		if (!betting) return;
+		if (!betting || pending.current) return;
 		machine.setBet(amount);
 		refresh();
 	};
 
 	const spin = () => {
-		if (machine.spin()) setSpins((count) => count + 1);
-		refresh();
+		void spinAgain();
 	};
 
 	const toggleAuto = () => {
@@ -126,6 +172,7 @@ export function SlotsOverlay({ onClose }: SlotsOverlayProps) {
 	return (
 		<div className="sl-overlay" data-testid="slots-overlay" data-phase={snapshot.phase}>
 			<div className="sl-panel" role="dialog" aria-label="Slot machine">
+				{spinError && <p role="alert">{spinError}</p>}
 				<header className="sl-header">
 					<h2 className="sl-title">Slots</h2>
 					<span className="sl-balance" data-testid="slots-balance">
@@ -145,7 +192,7 @@ export function SlotsOverlay({ onClose }: SlotsOverlayProps) {
 						type="button"
 						className="sl-close"
 						data-testid="slots-close"
-						disabled={spinning}
+						disabled={spinning || awaitingSpin}
 						onClick={onClose}
 					>
 						Leave
@@ -178,7 +225,7 @@ export function SlotsOverlay({ onClose }: SlotsOverlayProps) {
 							}
 							data-testid={`slots-bet-${amount}`}
 							aria-pressed={amount === snapshot.bet}
-							disabled={!betting || amount > snapshot.balance}
+							disabled={!betting || awaitingSpin || pending.current !== null || amount > snapshot.balance}
 							onClick={() => chooseBet(amount)}
 						>
 							${amount}
@@ -197,7 +244,7 @@ export function SlotsOverlay({ onClose }: SlotsOverlayProps) {
 						type="button"
 						className="sl-action sl-primary"
 						data-testid="slots-spin"
-						disabled={!betting || snapshot.betError !== null}
+						disabled={!betting || awaitingSpin || (snapshot.betError !== null && pending.current === null)}
 						onClick={spin}
 					>
 						{spinning ? "Spinning…" : `Spin $${snapshot.bet}`}

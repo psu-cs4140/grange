@@ -12,6 +12,26 @@ defmodule GrangeWeb.DevController do
 
   @session_key :user_token
 
+  @doc "Funds the signed-in fixture account during a browser test run."
+  def fund_wallet(conn, %{"amount" => amount}) when is_integer(amount) and amount in 1..100_000 do
+    if System.get_env("GRANGE_E2E") == "1" do
+      case Accounts.resolve_token(get_session(conn, @session_key)) do
+        {:ok, user} ->
+          {:ok, balance} = Accounts.apply_balance_delta(user.id, amount)
+          json(conn, %{ok: true, balance: balance})
+
+        :error ->
+          unauthorized(conn)
+      end
+    else
+      GrangeWeb.FallbackController.not_found(conn, %{})
+    end
+  end
+
+  def fund_wallet(conn, _params) do
+    conn |> put_status(:bad_request) |> json(%{ok: false, error: "invalid fixture amount"})
+  end
+
   @doc """
   Seeds the signed-in player's farmhand quest and/or barn.
 

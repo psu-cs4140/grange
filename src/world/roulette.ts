@@ -1,4 +1,14 @@
 /** Roulette core: pockets, colors, bet types, and payout math. */
+export const ROULETTE_LEGEND = [
+	["Straight", "35:1"],
+	["Split", "17:1"],
+	["Street", "11:1"],
+	["Corner", "8:1"],
+	["Five number (0-00-1-2-3)", "6:1"],
+	["Line", "5:1"],
+	["Column / Dozen", "2:1"],
+	["Red / Black / Odd / Even / 1-18 / 19-36", "1:1"],
+] as const;
 
 /** Smallest allowed wager on a single spot. */
 export const MIN_BET = 5;

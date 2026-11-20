@@ -286,24 +286,84 @@ defmodule GrangeWeb.AuthControllerTest do
     assert %{"ok" => false} = json_response(conn, 401)
   end
 
-  test "a signed-in account can spend and earn" do
+  test "a regular account can spend but cannot grant itself wallet credits" do
     conn = register_and_verify() |> recycle()
 
     conn = json_post(conn, "/api/economy/transaction", %{"delta" => -25})
     assert %{"ok" => true, "balance" => 75} = json_response(conn, 200)
 
     conn = conn |> recycle() |> json_post("/api/economy/transaction", %{"delta" => 5})
-    assert %{"ok" => true, "balance" => 80} = json_response(conn, 200)
+    assert %{"ok" => false} = json_response(conn, 403)
 
     # The change belongs to the account, not the connection.
     me = conn |> recycle() |> get("/api/auth/me")
-    assert %{"user" => %{"balance" => 80}} = json_response(me, 200)
+    assert %{"user" => %{"balance" => 75}} = json_response(me, 200)
   end
 
   test "balance transactions reject a non-integer delta" do
     conn = register_and_verify() |> recycle()
     conn = json_post(conn, "/api/economy/transaction", %{"delta" => "loot"})
     assert %{"ok" => false} = json_response(conn, 400)
+  end
+
+  test "slot spins settle once and reject reuse with a different wager" do
+    conn = register_and_verify() |> recycle()
+    params = %{"spin_id" => Ecto.UUID.generate(), "bet" => 5}
+    conn = json_post(conn, "/api/casino/slots/spin", params)
+
+    assert %{"reels" => [_, _, _], "payout" => payout, "balance" => balance} =
+             result = json_response(conn, 200)
+
+    assert balance == 95 + payout
+
+    retry = conn |> recycle() |> json_post("/api/casino/slots/spin", params)
+    assert json_response(retry, 200) == result
+
+    conflict =
+      retry |> recycle() |> json_post("/api/casino/slots/spin", %{params | "bet" => 10})
+
+    assert %{"error" => _} = json_response(conflict, 409)
+
+    assert %{"user" => %{"balance" => ^balance}} =
+             conflict |> recycle() |> get("/api/auth/me") |> json_response(200)
+  end
+
+  test "roulette validates spots and replays the same settled spin" do
+    conn = register_and_verify() |> recycle()
+    path = "/api/casino/roulette/spin"
+    spin_id = Ecto.UUID.generate()
+    invalid = json_post(conn, path, %{"spin_id" => spin_id, "bets" => %{"n:999" => 5}})
+    assert %{"error" => _} = json_response(invalid, 400)
+
+    params = %{"spin_id" => spin_id, "bets" => %{"n:0" => 5}}
+    spin = invalid |> recycle() |> json_post(path, params)
+    result = json_response(spin, 200)
+    assert %{"pocket" => pocket, "payout" => payout, "balance" => balance} = result
+    assert payout == if(pocket == "0", do: 180, else: 0)
+    assert balance == 95 + payout
+
+    retry = spin |> recycle() |> json_post(path, params)
+    assert json_response(retry, 200) == result
+  end
+
+  test "poker resumes the same hand and never posts the blind twice" do
+    path = "/api/casino/poker"
+    action = %{"action_id" => Ecto.UUID.generate(), "version" => 0, "move" => "deal"}
+    conn = register_and_verify() |> recycle() |> json_post(path, action)
+    result = json_response(conn, 200)
+    assert %{"version" => 1, "balance" => 95, "hand" => hand} = result
+    assert %{"phase" => "playerTurn", "pot" => 15, "dealerHidden" => true} = hand
+    assert Enum.uniq(hand["dealerHole"]) |> length() == 1
+    refute Map.has_key?(hand, "deck")
+
+    retry = conn |> recycle() |> json_post(path, action)
+    assert json_response(retry, 200) == result
+
+    resumed = retry |> recycle() |> get(path)
+    assert json_response(resumed, 200) == result
+
+    stale = %{action | "action_id" => Ecto.UUID.generate(), "move" => "fold"}
+    assert resumed |> recycle() |> json_post(path, stale) |> json_response(409)
   end
 
   test "unmatched /api routes return JSON even when html is requested" do

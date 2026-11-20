@@ -1,26 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { economy } from "./EconomyManager";
-import { MIN_BET, pocketColor } from "./roulette";
+import { MIN_BET, pocketColor, ROULETTE_LEGEND } from "./roulette";
 import { RouletteBetGrid } from "./RouletteBetGrid";
 import { RouletteChip } from "./RouletteChip";
 import { RouletteTable } from "./rouletteGame";
 import { BET_SPOT_BY_ID } from "./rouletteLayout";
+import { requestRouletteSpin, RouletteSpinError, type RouletteSpinRequest } from "./rouletteSpin";
 import type { Bank, BetSpot, RouletteSnapshot } from "./rouletteTypes";
 import { RouletteWheel } from "./RouletteWheel";
 import "./roulette.css";
 
 const CHIPS = [5, 25, 100];
 
-const LEGEND: Array<[string, string]> = [
-	["Straight", "35:1"],
-	["Split", "17:1"],
-	["Street", "11:1"],
-	["Corner", "8:1"],
-	["Five number (0-00-1-2-3)", "6:1"],
-	["Line", "5:1"],
-	["Column / Dozen", "2:1"],
-	["Red / Black / Odd / Even / 1-18 / 19-36", "1:1"],
-];
 
 interface RouletteOverlayProps {
 	onClose: () => void;
@@ -44,16 +35,20 @@ export function RouletteOverlay({ onClose }: RouletteOverlayProps) {
 	const [dialogSpot, setDialogSpot] = useState<BetSpot | null>(null);
 	const [amountInput, setAmountInput] = useState(String(MIN_BET));
 	const trayRef = useRef<HTMLDivElement>(null);
+	const pendingSpin = useRef<RouletteSpinRequest | null>(null);
+	const requestInFlight = useRef(false);
+	const [sending, setSending] = useState(false);
+	const [spinError, setSpinError] = useState("");
 
 	const refresh = useCallback(() => setSnapshot(table.snapshot()), [table]);
 
-	const betting = snapshot.phase === "betting";
+	const betting = snapshot.phase === "betting" && !sending;
 	const spinning = snapshot.phase === "spinning";
 	const settled = snapshot.phase === "settled";
 
 	useEffect(() => {
 		const onKey = (event: KeyboardEvent) => {
-			if (event.key === "Escape" && !spinning) onClose();
+			if (event.key === "Escape" && !spinning && !requestInFlight.current) onClose();
 		};
 		window.addEventListener("keydown", onKey);
 		return () => window.removeEventListener("keydown", onKey);
@@ -70,7 +65,7 @@ export function RouletteOverlay({ onClose }: RouletteOverlayProps) {
 	};
 
 	const onSpotClick = (spot: BetSpot) => {
-		if (!betting) return;
+		if (!betting || pendingSpin.current) return;
 		if (snapshot.bets.some((bet) => bet.spotId === spot.id)) {
 			table.removeBet(spot.id);
 			refresh();
@@ -81,15 +76,41 @@ export function RouletteOverlay({ onClose }: RouletteOverlayProps) {
 	};
 
 	const confirmBet = () => {
-		if (!dialogSpot || amountError() !== null) return;
+		if (!dialogSpot || pendingSpin.current || amountError() !== null) return;
 		const ok = table.placeBet(dialogSpot, Number(amountInput));
 		refresh();
 		if (ok) setDialogSpot(null);
 	};
 
-	const spin = () => {
-		table.spin();
-		refresh();
+	const spin = async () => {
+		if (!betting || requestInFlight.current || snapshot.bets.length === 0) return;
+		if (economy.isAdmin()) {
+			table.spin();
+			refresh();
+			return;
+		}
+
+		const request = pendingSpin.current ?? {
+			spin_id: crypto.randomUUID(),
+			bets: Object.fromEntries(snapshot.bets.map(({ spotId, amount }) => [spotId, amount])),
+		};
+		pendingSpin.current = request;
+		requestInFlight.current = true;
+		setSending(true);
+		setSpinError("");
+		try {
+			const result = await requestRouletteSpin(request);
+			economy.setBalance(result.balance);
+			table.showServerSpin(result.pocket);
+			pendingSpin.current = null;
+			refresh();
+		} catch (error) {
+			if (error instanceof RouletteSpinError && !error.retryable) pendingSpin.current = null;
+			setSpinError(error instanceof Error ? error.message : "The spin could not be confirmed.");
+		} finally {
+			requestInFlight.current = false;
+			setSending(false);
+		}
 	};
 
 	const onLanded = useCallback(() => setSnapshot(table.settle()), [table]);
@@ -107,6 +128,7 @@ export function RouletteOverlay({ onClose }: RouletteOverlayProps) {
 	return (
 		<div className="rl-overlay" data-testid="roulette-overlay">
 			<div className="rl-panel" role="dialog" aria-label="Roulette table">
+				{spinError && <p role="alert">{spinError}</p>}
 				<header className="rl-header">
 					<h2 className="rl-title">Roulette</h2>
 					<span className="rl-balance" data-testid="roulette-balance">
@@ -127,7 +149,7 @@ export function RouletteOverlay({ onClose }: RouletteOverlayProps) {
 						type="button"
 						className="rl-close"
 						data-testid="roulette-close"
-						disabled={spinning}
+						disabled={spinning || sending}
 						onClick={onClose}
 					>
 						Leave
@@ -159,7 +181,7 @@ export function RouletteOverlay({ onClose }: RouletteOverlayProps) {
 						<div className="rl-felt">
 							<RouletteBetGrid
 								bets={snapshot.bets}
-								disabled={!betting}
+								disabled={!betting || pendingSpin.current !== null}
 								result={settled ? snapshot.result : null}
 								onSpotClick={onSpotClick}
 							/>
@@ -208,7 +230,7 @@ export function RouletteOverlay({ onClose }: RouletteOverlayProps) {
 				<details className="rl-legend" data-testid="roulette-legend">
 					<summary>Payouts</summary>
 					<ul>
-						{LEGEND.map(([label, odds]) => (
+						{ROULETTE_LEGEND.map(([label, odds]) => (
 							<li key={label}>
 								<span>{label}</span>
 								<span>{odds}</span>

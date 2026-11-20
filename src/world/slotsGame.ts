@@ -26,6 +26,7 @@ export class SlotMachine {
 	private payout = 0;
 	private net = 0;
 	private rigged: SlotSymbol | null = null;
+	private settledByServer = false;
 	private message = "Choose a bet and spin.";
 
 	constructor(bank: Bank, options: SlotsOptions = {}) {
@@ -84,11 +85,23 @@ export class SlotMachine {
 		return true;
 	}
 
-	/** Resolves the round. Called once the reel animation has finished. */
+	/** Animates a round whose wager and payout have already been settled. */
+	showServerSpin(reels: SlotSymbol[], payout: number): void {
+		this.reels = reels;
+		this.win = winningSymbol(reels);
+		this.payout = payout;
+		this.settledByServer = true;
+		this.phase = "spinning";
+		this.message = "Spinning…";
+	}
+
+	/** Resolves the round once the reel animation has finished. */
 	settle(): SlotsSnapshot {
 		if (this.phase !== "spinning") return this.snapshot();
-		this.payout = this.win ? payoutFor(this.win, this.bet) : 0;
-		if (this.payout > 0) this.bank.deposit(this.payout);
+		if (!this.settledByServer) {
+			this.payout = this.win ? payoutFor(this.win, this.bet) : 0;
+			if (this.payout > 0) this.bank.deposit(this.payout);
+		}
 		this.net = this.payout - this.bet;
 		this.phase = "settled";
 		this.message = this.resultMessage();
@@ -98,6 +111,7 @@ export class SlotMachine {
 	newRound(): void {
 		if (this.phase !== "settled") return;
 		this.phase = "betting";
+		this.settledByServer = false;
 		this.reels = [];
 		this.win = null;
 		this.payout = 0;
