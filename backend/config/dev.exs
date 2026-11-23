@@ -8,6 +8,15 @@ config :grange, GrangeWeb.Endpoint,
 
 config :grange, enable_test_routes: true
 
+# Opt-in local administrator bootstrap. Set GRANGE_START_ADMIN=1 together with
+# GRANGE_ADMIN_USERNAME, GRANGE_ADMIN_EMAIL, and GRANGE_ADMIN_PASSWORD to seed
+# an admin on boot. There are no hardcoded fallback credentials.
+config :grange,
+  start_admin: System.get_env("GRANGE_START_ADMIN") == "1",
+  admin_username: System.get_env("GRANGE_ADMIN_USERNAME"),
+  admin_email: System.get_env("GRANGE_ADMIN_EMAIL"),
+  admin_password: System.get_env("GRANGE_ADMIN_PASSWORD")
+
 # E2E runs shrink the growth window so specs do not wait 10s per crop. Normal
 # development keeps the full cycle unless GRANGE_GROW_MS is set.
 config :grange, grow_ms: String.to_integer(System.get_env("GRANGE_GROW_MS") || "10000")

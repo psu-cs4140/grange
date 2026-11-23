@@ -22,12 +22,6 @@ defmodule Grange.Accounts do
   # any in-game price; debits against it are ignored (see apply_balance_delta/2).
   @admin_balance 1_000_000_000
 
-  # The built-in admin login. `ensure_admin/0` keeps it available without the
-  # operator having to run `mix grange.create_admin` first.
-  @admin_username "admin"
-  @admin_email "admin@grange.test"
-  @admin_password "grange-admin"
-
   @spec register(map()) :: {:ok, User.t()} | {:error, String.t()}
   def register(attrs) do
     username = attrs |> fetch(:username) |> String.trim()
@@ -139,32 +133,59 @@ defmodule Grange.Accounts do
   """
   @spec grant_admin(String.t(), String.t() | nil) :: {:ok, User.t()} | {:error, String.t()}
   def grant_admin(username, password) do
-    case Repo.get_by(User, username: username) do
-      nil -> {:error, "unknown user"}
-      %User{} = user -> promote(user, password)
+    with :ok <- validate_optional_password(password) do
+      case Repo.get_by(User, username: username) do
+        nil -> {:error, "unknown user"}
+        %User{} = user -> promote(user, password)
+      end
     end
   end
 
   @doc """
-  Ensures the built-in admin account exists.
+  True when the given account id belongs to a current administrator.
 
-  Called on boot and after a dev reset so the default login is always
-  available. If the default username already exists it is promoted; if only
-  the default email is taken, that account is promoted instead.
+  Callers should use this instead of trusting an `is_admin` value copied onto a
+  socket, token, or client payload.
+  """
+  @spec admin?(String.t() | nil) :: boolean()
+  def admin?(user_id) when is_binary(user_id) do
+    Repo.exists?(from(u in User, where: u.id == ^user_id and u.is_admin == true))
+  end
+
+  def admin?(_user_id), do: false
+
+  @doc """
+  Ensures the configured administrator account exists.
+
+  Credentials come from `:admin_username`, `:admin_email`, and `:admin_password`
+  app configuration (the `GRANGE_ADMIN_*` environment variables in dev). There
+  is no built-in default; when any value is missing this returns an error and
+  leaves every account untouched, so startup can log a warning and continue.
+
+  The account is identified by username only. An existing account is promoted
+  only when its email also matches the configured administrator email, so
+  taking the username alone cannot grant admin rights. A configured email that
+  already belongs to another account is never touched.
   """
   @spec ensure_admin() :: {:ok, User.t()} | {:error, String.t()}
   def ensure_admin do
-    case Repo.get_by(User, username: @admin_username) ||
-           Repo.get_by(User, email: @admin_email) do
-      nil ->
-        register_admin(%{
-          "username" => @admin_username,
-          "email" => @admin_email,
-          "password" => @admin_password
-        })
+    with {:ok, username} <- admin_setting(:admin_username),
+         {:ok, email} <- admin_setting(:admin_email),
+         {:ok, password} <- admin_setting(:admin_password) do
+      ensure_admin(%{"username" => username, "email" => email, "password" => password})
+    end
+  end
 
-      %User{} = user ->
-        grant_admin(user.username)
+  @doc false
+  @spec ensure_admin(map()) :: {:ok, User.t()} | {:error, String.t()}
+  def ensure_admin(attrs) do
+    username = attrs |> fetch(:username) |> String.trim()
+    email = attrs |> fetch(:email) |> String.trim() |> String.downcase()
+    password = fetch(attrs, :password)
+
+    case Repo.get_by(User, username: username) do
+      nil -> create_configured_admin(username, email, password)
+      %User{} = user -> promote_configured_admin(user, email, password)
     end
   end
 
@@ -236,6 +257,41 @@ defmodule Grange.Accounts do
         :ok
     end
   end
+
+  defp create_configured_admin(username, email, password) do
+    case Repo.get_by(User, email: email) do
+      nil ->
+        register_admin(%{"username" => username, "email" => email, "password" => password})
+
+      %User{} = other ->
+        {:error, "admin email already belongs to #{other.username}"}
+    end
+  end
+
+  # Promoting an existing account is safe only when the configured admin email
+  # also matches, which proves this is the account the operator configured. A
+  # user who merely grabbed the username is left untouched.
+  defp promote_configured_admin(%User{email: email} = user, email, password) do
+    grant_admin(user.username, password)
+  end
+
+  defp promote_configured_admin(%User{}, _email, _password) do
+    {:error, "configured admin username belongs to another account"}
+  end
+
+  defp admin_setting(key) do
+    case Application.get_env(:grange, key) do
+      value when is_binary(value) and value != "" -> {:ok, value}
+      _ -> {:error, "#{key} is not configured"}
+    end
+  end
+
+  defp validate_optional_password(nil), do: :ok
+
+  defp validate_optional_password(password) when is_binary(password),
+    do: validate_password(password)
+
+  defp validate_optional_password(_password), do: {:error, "password must be a string"}
 
   defp validate_username(username) do
     if Regex.match?(@username_re, username) do

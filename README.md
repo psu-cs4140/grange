@@ -45,26 +45,36 @@ production uses `<release-root>/data/grange.sqlite3` (override with
 ## Admin account
 
 An admin account is handed every item in the game and effectively unlimited
-Grangecoin. The default admin is created automatically on boot (and re-created
-after a dev `/api/reset`), so it is always available:
+Grangecoin. Admins are marked by the server-side `is_admin` flag; the SPA
+grants the full item catalog on sign-in, and the wallet ignores spending while
+the account is an admin.
 
-- username `admin`
-- email `admin@grange.test`
-- password `grange-admin`
-
-Admins are marked by the `is_admin` flag on the account. The SPA grants the
-full item catalog on sign-in, and the wallet ignores spending while `is_admin`
-is set.
-
-To create or promote a different admin, or to reset the default password, use:
+There is no built-in administrator and no default password. Automatic creation
+is disabled by default and never runs in production. To opt in for local
+development, set all four variables before `pnpm dev`:
 
 ```sh
-pnpm admin:create
+export GRANGE_START_ADMIN=1
+export GRANGE_ADMIN_USERNAME=admin
+export GRANGE_ADMIN_EMAIL=admin@example.test
+export GRANGE_ADMIN_PASSWORD='choose-a-long-random-password'
+```
+
+If any of the three credentials is missing, startup logs a warning and skips
+admin creation instead of falling back to a known login. The account is
+identified by its configured username; an existing account is only promoted
+when its email also matches, so registering the configured username cannot
+grant admin rights.
+
+To create or promote an admin manually, run:
+
+```sh
 pnpm admin:create -- --username root --email root@example.test --password long-enough
 ```
 
-Re-running the command on an existing username promotes that account instead of
-creating a new one; pass `--password` to also reset its password.
+If `--password` is omitted for a new account, the task generates a random
+password and prints it once. Re-running the command on an existing username
+promotes that account; pass `--password` to also reset its password.
 
 ## Tests
 

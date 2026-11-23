@@ -218,8 +218,15 @@ releases stay current; there is no separate release migration task.
   after sign-in/out so the handshake carries the new token.
 - Passwords are Argon2-hashed. Sessions are 30 days; only a SHA-256 hex hash of
   the token is stored.
-- `is_admin` is a DB flag. On sign-in the client grants the full item catalog
-  **client-side**; there is no server-side admin authorization middleware.
+- `is_admin` is a DB flag. Privileged server operations re-read it from the
+  database with `Accounts.admin?/1` (private-farm joins, prop moves, and the
+  admin seed grant), so a forged socket flag or client payload grants nothing.
+  The SPA also grants the full item catalog client-side for admins, but that is
+  presentation only.
+- Automatic administrator creation is opt-in (`start_admin`), development-only,
+  and reads `GRANGE_ADMIN_USERNAME`, `GRANGE_ADMIN_EMAIL`, and
+  `GRANGE_ADMIN_PASSWORD`. There is no default login, and production never
+  seeds an admin.
 
 ### 5.5 HTTP API (non-channel)
 
@@ -499,6 +506,7 @@ not rendered UI.
 │   ├── config/{config,dev,test,prod,runtime}.exs
 │   ├── lib/grange/
 │   │   ├── application.ex     ← supervision + boot migrations
+│   │   ├── admin_bootstrap.ex ← opt-in dev-only admin seed
 │   │   ├── repo.ex            ← Ecto SQLite repo
 │   │   ├── accounts.ex        ← registration/login/sessions/balance
 │   │   ├── farm_store.ex      ← farm transactions, views, tick, broadcasts
@@ -1193,8 +1201,11 @@ runs Gitleaks.
     `backend/priv/static/index.html`; `pnpm test:e2e` builds first.
 19. **`vite preview` intentionally mirrors the dev proxy.** Keep both proxy
     blocks in `vite.config.ts` in sync.
-20. **Admin inventory is client-side.** `is_admin` only triggers
-    `grantAllItems()` on sign-in. There is no server-side item authorization.
+20. **Admin inventory is client-side, admin authorization is not.** `is_admin`
+    triggers `grantAllItems()` on sign-in, but server checks must use
+    `Accounts.admin?/1`; never trust an `is_admin` flag copied onto a socket or
+    sent by a client. Automatic admin creation is off unless `start_admin` is
+    true in development.
 21. **The server trusts balance deltas.** `POST /api/economy/transaction`
     accepts any integer delta from a logged-in user. Do not treat it as a
     secure economy authority.

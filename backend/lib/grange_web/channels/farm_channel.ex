@@ -10,7 +10,16 @@ defmodule GrangeWeb.FarmChannel do
 
   use Phoenix.Channel
 
-  alias Grange.{BarnStorage, FarmGateActions, FarmSettings, FarmStore, Inventory, WorldPosition}
+  alias Grange.{
+    Accounts,
+    BarnStorage,
+    FarmGateActions,
+    FarmSettings,
+    FarmStore,
+    Inventory,
+    WorldPosition
+  }
+
   alias GrangeWeb.Presence
 
   # A client sends at ~10 Hz; this only guards against abusive or buggy loops.
@@ -19,21 +28,22 @@ defmodule GrangeWeb.FarmChannel do
   @impl true
   def join("farm:" <> owner, _payload, socket) do
     case socket.assigns[:user] do
-      %{username: username} ->
-        join_farm(owner, username, socket)
+      %{username: username} = user ->
+        join_farm(owner, username, user, socket)
 
       _ ->
         {:error, %{error: "not logged in"}}
     end
   end
 
-  defp join_farm(owner, username, socket) do
+  defp join_farm(owner, username, user, socket) do
     # Every account that can act needs its own farm row first: inventory and
     # barn rows reference `farms.owner`, and a visitor may plant with seeds.
     FarmStore.ensure(username)
 
-    # Admins join any farm so they can rearrange buildings anywhere.
-    admin? = socket.assigns[:user].is_admin
+    # Admins join any farm so they can rearrange buildings anywhere. Re-read the
+    # flag from the database instead of trusting anything copied onto the socket.
+    admin? = Accounts.admin?(Map.get(user, :id))
 
     cond do
       not FarmStore.has_farm?(owner) ->
@@ -165,7 +175,7 @@ defmodule GrangeWeb.FarmChannel do
     cond do
       is_nil(user) -> {:reply, {:error, %{error: "not logged in"}}, socket}
       user.username == owner -> handler.(owner)
-      user.is_admin -> handler.(owner)
+      Accounts.admin?(Map.get(user, :id)) -> handler.(owner)
       FarmStore.edit_allowed?(owner) -> handler.(owner)
       true -> {:reply, {:error, %{error: "not your farm"}}, socket}
     end

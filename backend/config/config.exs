@@ -5,6 +5,17 @@ config :grange, ecto_repos: [Grange.Repo]
 # Crops ripen on a timer in dev/prod; tests drive `FarmStore.tick/1` directly.
 config :grange, start_ticker: true
 
+# Automatic administrator creation is opt-in and disabled by default. Even when
+# enabled it never runs in production. Credentials must come from the
+# environment; there is no built-in default login.
+config :grange, start_admin: false
+config :grange, env: config_env()
+
+config :grange,
+  admin_username: nil,
+  admin_email: nil,
+  admin_password: nil
+
 config :grange, GrangeWeb.Endpoint,
   adapter: Bandit.PhoenixAdapter,
   url: [host: "localhost"],

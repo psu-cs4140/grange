@@ -165,23 +165,98 @@ defmodule Grange.AccountsTest do
     assert {:error, _} = Accounts.authenticate("Alice", "harvest-please")
   end
 
-  test "ensure_admin creates the default admin account idempotently" do
-    assert {:ok, admin} = Accounts.ensure_admin()
-    assert admin.username == "admin"
-    assert admin.is_admin
+  describe "ensure_admin" do
+    setup do
+      keys = [:admin_username, :admin_email, :admin_password]
+      original = Map.new(keys, &{&1, Application.get_env(:grange, &1)})
 
-    assert {:ok, again} = Accounts.ensure_admin()
-    assert again.id == admin.id
+      on_exit(fn ->
+        Enum.each(original, fn {key, value} -> Application.put_env(:grange, key, value) end)
+      end)
+
+      :ok
+    end
+
+    test "creates the configured admin account idempotently" do
+      set_admin_credentials("root", "root@example.test", "harvest-please")
+
+      assert {:ok, admin} = Accounts.ensure_admin()
+      assert admin.username == "root"
+      assert admin.email == "root@example.test"
+      assert admin.is_admin
+      assert Accounts.admin?(admin.id)
+
+      assert {:ok, again} = Accounts.ensure_admin()
+      assert again.id == admin.id
+    end
+
+    test "refuses to invent credentials when none are configured" do
+      clear_admin_credentials()
+
+      assert {:error, message} = Accounts.ensure_admin()
+      assert message =~ "not configured"
+      assert Accounts.list_users() == []
+    end
+
+    test "never falls back to the old default admin login" do
+      clear_admin_credentials()
+
+      assert {:error, _message} = Accounts.ensure_admin()
+      refute Enum.any?(Accounts.list_users(), &(&1.username == "admin"))
+    end
+
+    test "does not promote an account that only matches the configured email" do
+      assert {:ok, user} =
+               register(%{"username" => "Mallory", "email" => "root@example.test"})
+
+      set_admin_credentials("root", "root@example.test", "harvest-please")
+
+      assert {:error, message} = Accounts.ensure_admin()
+      assert message =~ "email already belongs"
+      refute reload(user.id).is_admin
+    end
+
+    test "does not promote a username squatter with a different email" do
+      assert {:ok, user} =
+               register(%{"username" => "root", "email" => "mallory@example.test"})
+
+      set_admin_credentials("root", "root@example.test", "harvest-please")
+
+      assert {:error, message} = Accounts.ensure_admin()
+      assert message =~ "belongs to another account"
+      refute reload(user.id).is_admin
+    end
+
+    test "promotes the existing account when username and email both match" do
+      assert {:ok, user} =
+               register(%{"username" => "root", "email" => "root@example.test"})
+
+      set_admin_credentials("root", "root@example.test", "harvest-please")
+
+      assert {:ok, admin} = Accounts.ensure_admin()
+      assert admin.id == user.id
+      assert admin.is_admin
+      assert {:ok, _} = Accounts.authenticate("root", "harvest-please")
+    end
   end
 
-  test "ensure_admin promotes an existing account that owns the username" do
-    assert {:ok, user} =
-             register(%{"username" => "admin", "email" => "owner@example.test"})
-
+  test "registration cannot request administrator privileges" do
+    assert {:ok, user} = register(%{"is_admin" => true})
     refute user.is_admin
-
-    assert {:ok, admin} = Accounts.ensure_admin()
-    assert admin.id == user.id
-    assert admin.is_admin
+    refute Accounts.admin?(user.id)
   end
+
+  defp set_admin_credentials(username, email, password) do
+    Application.put_env(:grange, :admin_username, username)
+    Application.put_env(:grange, :admin_email, email)
+    Application.put_env(:grange, :admin_password, password)
+  end
+
+  defp clear_admin_credentials do
+    Application.put_env(:grange, :admin_username, nil)
+    Application.put_env(:grange, :admin_email, nil)
+    Application.put_env(:grange, :admin_password, nil)
+  end
+
+  defp reload(id), do: Enum.find(Accounts.list_users(), &(&1.id == id))
 end

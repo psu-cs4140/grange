@@ -14,19 +14,20 @@ defmodule Mix.Tasks.Grange.CreateAdmin do
 
     * `--username` (default `admin`)
     * `--email` (default `admin@grange.test`)
-    * `--password` - at least 8 characters; defaults to `grange-admin` for a new
-      account, and resets an existing account's password only when passed
+    * `--password` - at least 8 characters. When omitted for a new account the
+      task generates a random password and prints it once. An existing account
+      keeps its password unless `--password` is passed.
 
   If the username already exists the account is promoted instead, so the task
-  is safe to re-run.
+  is safe to re-run. There is no built-in password.
   """
 
   use Mix.Task
 
   @default_username "admin"
   @default_email "admin@grange.test"
-  @default_password "grange-admin"
   @min_password 8
+  @generated_password_bytes 18
 
   @impl Mix.Task
   def run(args) do
@@ -45,15 +46,17 @@ defmodule Mix.Tasks.Grange.CreateAdmin do
   end
 
   defp create_or_promote(username, email, reset_password) do
+    password = reset_password || generate_password()
+
     attrs = %{
       "username" => username,
       "email" => email,
-      "password" => reset_password || @default_password
+      "password" => password
     }
 
     case Grange.Accounts.register_admin(attrs) do
       {:ok, user} ->
-        report(user, reset_password || @default_password)
+        report(user, password)
 
       {:error, "that username is taken"} ->
         promote(username, reset_password)
@@ -61,6 +64,11 @@ defmodule Mix.Tasks.Grange.CreateAdmin do
       {:error, reason} ->
         Mix.raise("could not create admin account: #{reason}")
     end
+  end
+
+  defp generate_password do
+    :crypto.strong_rand_bytes(@generated_password_bytes)
+    |> Base.url_encode64(padding: false)
   end
 
   defp validate_password!(nil), do: :ok

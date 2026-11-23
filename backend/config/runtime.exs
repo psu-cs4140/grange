@@ -1,6 +1,9 @@
 import Config
 
 if config_env() == :prod do
+  # Defense in depth: production startup must never seed an administrator.
+  config :grange, start_admin: false
+
   secret_key_base =
     System.get_env("SECRET_KEY_BASE") ||
       raise "environment variable SECRET_KEY_BASE is missing"

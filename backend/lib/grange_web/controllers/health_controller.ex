@@ -15,8 +15,8 @@ defmodule GrangeWeb.HealthController do
 
   def reset(conn, _params) do
     Accounts.reset()
-    # A dev reset must not remove the always-available default admin.
-    Accounts.ensure_admin()
+    # Only an explicitly configured development bootstrap reseeds an admin.
+    Grange.AdminBootstrap.ensure()
     FarmStore.reset()
     json(conn, %{ok: true})
   end
