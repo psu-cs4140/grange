@@ -1,5 +1,7 @@
 import { expect, type Page, test } from "@playwright/test";
-import { BASE, registerFast, uniqueName, walkUntilPrompt } from "./helpers";
+import { npcAnchor } from "../src/world/farmNpcPosition";
+import { props } from "../src/world/mapData";
+import { BASE, movePlayerNear, registerFast, uniqueName } from "./helpers";
 
 /**
  * Seeds the signed-in player's quest/barn through the dev-only route. The
@@ -41,8 +43,6 @@ test("farmhand walks the player through tomatoes, supplies, and farewell", async
 	page,
 }) => {
 	test.setTimeout(120_000);
-	// Walt's radius is crossed in about a frame at the e2e 3x speed, so walk at
-	// production speed to read his prompt reliably.
 	await registerFast(page, uniqueName("Hand"), { walk: "normal" });
 	await expect(page).toHaveURL(/\/world(?:\?.*)?$/);
 	await seedNpc(page, {
@@ -51,9 +51,12 @@ test("farmhand walks the player through tomatoes, supplies, and farewell", async
 		barn: {},
 	});
 
-	// He stands beside the farmhouse, close enough that walking up reaches him
-	// before the house prompt.
-	await walkUntilPrompt(page, ["a", "w"], "talk to Walt", 20_000);
+	// Approach from the open ground east of his patrol. This position is in
+	// talk range at either end of Walt's route, regardless of frame timing.
+	const home = npcAnchor(props.find((prop) => prop.asset === "farmhouse") ?? null);
+	if (!home) throw new Error("Starter farm has no farmhouse for Walt.");
+	await movePlayerNear(page, home.x + 70, home.y + 20, 12, { reach: 12 });
+	await expect(page.getByTestId("travel-prompt")).toContainText("talk to Walt");
 	await talkToNpc(page);
 
 	// First talk is the welcome; dismissing it records the intro and continues
