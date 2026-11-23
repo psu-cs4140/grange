@@ -17,7 +17,6 @@ defmodule Grange.FarmStore do
   alias Grange.{
     Barn,
     BarnItem,
-    BarnStorage,
     Crops,
     Farm,
     FarmAction,
@@ -65,36 +64,8 @@ defmodule Grange.FarmStore do
   @spec view(String.t()) :: map() | nil
   def view(owner) do
     case Repo.get(FarmRecord, owner) do
-      nil ->
-        nil
-
-      farm ->
-        barn = Barn.map(owner)
-        time = Grange.WorldClock.snapshot()
-
-        %{
-          owner: owner,
-          tiles: FarmView.tiles(owner),
-          barn: barn,
-          tomatoes: Map.get(barn, "tomato", 0),
-          fences: FarmFences.list(owner),
-          fence_count: farm.fence_count,
-          gates: FarmGates.list(owner),
-          gate_count: farm.gate_count,
-          sprinklers: FarmSprinklers.list(owner),
-          sprinkler_count: farm.sprinkler_count,
-          animals: farm.animals,
-          placed_animals: FarmAnimals.list(owner),
-          land_level: farm.land_level,
-          is_public: farm.is_public,
-          visitor_edit: farm.visitor_edit,
-          prop_overrides: FarmProps.overrides(owner),
-          prop_inventory: FarmProps.inventory(owner),
-          storage: BarnStorage.inventory(farm),
-          time: time,
-          cycle_time_ms: time.cycle_time_ms,
-          day_phase: time.phase
-        }
+      nil -> nil
+      farm -> FarmView.active(farm)
     end
   end
 

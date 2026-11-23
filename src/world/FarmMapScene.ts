@@ -40,6 +40,7 @@ import { setFarmLandLevel } from "./sceneObstacles";
 import { SprinklerLayer } from "./sprinklerRendering";
 import { SweepFx } from "./sweepFx";
 import { findTrainRest, TrainController } from "./train";
+import { farmTrainOptions } from "./trainOptions";
 import { publishViewTransform } from "./viewTransform";
 import type { SceneActivationData, WorldArea } from "./WalkingScene";
 
@@ -101,6 +102,7 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 			(prompt) => this.fishing.setTravelPrompt(prompt),
 			onAreaChange,
 			onOpenTravel,
+			isOwner,
 			isNightNow,
 		);
 		this.barn = new FarmBarn(isOwner);
@@ -123,17 +125,16 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 		});
 
 		// Populate saved farm props and their collision/tool footprints.
-		this.farmProps.set(
-			useGameStore.getState().activeFarm?.prop_overrides ?? [],
-		);
+		this.farmProps.set(useGameStore.getState().activeFarm?.prop_overrides ?? []);
 		const farm = useGameStore.getState().activeFarm;
 		setFarmLandLevel(farm?.land_level ?? 0);
 		this.fences.set(farm?.fences ?? [], farm?.gates ?? []);
 		this.sprinklers.set(farm?.sprinklers ?? []);
 		this.animals.set(farm, this.blocks);
 
-		// The train is animated separately from the static prop layer.
-		this.train = new TrainController(findTrainRest(props), this);
+		// The train is animated separately from the static prop layer. Its
+		// engine and cargo come from the farm snapshot, so upgrades show here.
+		this.train = new TrainController(findTrainRest(props), this, farmTrainOptions());
 
 		this.player = createFarmPlayer(this);
 		this.presence = new FarmScenePresence(this, this.player, (text) =>

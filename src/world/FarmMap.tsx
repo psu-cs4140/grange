@@ -21,7 +21,7 @@ import { ComboCounter } from "./ComboCounter";
 import type { FarmMapScene } from "./FarmMapScene";
 import { FarmStatusHud } from "./FarmStatusHud";
 import { FishingOverlay } from "./FishingOverlay";
-import type { FarmHudSnapshot } from "./farmHud";
+import { type FarmHudSnapshot, INITIAL_FARM_HUD } from "./farmHud";
 import { subscribeFarmPeers } from "./farmPresence";
 import "./farmMap.css";
 import { HouseMenu } from "./HouseMenu";
@@ -71,16 +71,13 @@ export default function FarmMap() {
 	const setPaused = usePauseStore((s) => s.setPaused);
 	const { owner } = useParams<{ owner?: string }>();
 	const navigate = useNavigate();
-	const [hud, setHud] = useState<FarmHudSnapshot>({
-		tomatoes: 0,
-		message: "Hoe: click or drag on grass to till.",
-		hovered: null,
-		player: { x: 0, y: 0 },
-	});
+	const [hud, setHud] = useState<FarmHudSnapshot>(INITIAL_FARM_HUD);
 
 	const target = owner ?? username;
 	const isOwner = target === username;
 	const [area, setArea] = useState<WorldArea>("Farm");
+	// Hubs report their own player position; the farm uses the HUD snapshot.
+	const [playerPos, setPlayerPos] = useState({ x: 0, y: 0 });
 	const {
 		market,
 		marketMessage,
@@ -190,6 +187,7 @@ export default function FarmMap() {
 		setEngineReady,
 		setMarket,
 		setMarketMessage,
+		setPlayerPos,
 		selectAnimal,
 		setLivestockMessage,
 		setBankDesk,
@@ -261,8 +259,8 @@ export default function FarmMap() {
 		<main
 			className="farm-map-page"
 			data-world-ready={worldReady ? "true" : "false"}
-			data-player-x={Math.round(hud.player.x)}
-			data-player-y={Math.round(hud.player.y)}
+			data-player-x={Math.round(area === "Farm" ? hud.player.x : playerPos.x)}
+			data-player-y={Math.round(area === "Farm" ? hud.player.y : playerPos.y)}
 			data-hub-peers={hubPeers.join(",")}
 			data-farm-peers={farmPeers.join(",")}
 			data-npc-stage={npcStatus?.stage ?? "none"}

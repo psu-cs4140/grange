@@ -38,6 +38,7 @@ defmodule GrangeWeb.Router do
     post("/admin/item", InventoryController, :admin_grant)
 
     post("/hardware/buy", HardwareController, :buy)
+    post("/train/buy", TrainController, :buy)
 
     get("/state", HealthController, :state)
 

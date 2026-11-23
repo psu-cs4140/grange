@@ -7,6 +7,7 @@ import type {
 	NpcQuestStatus,
 	SleepVote,
 	SleepVoteResultPayload,
+	TrainAction,
 } from "../../shared/types";
 import {
 	type Ack,
@@ -281,6 +282,26 @@ export function emitFarmPropAction(
 /** The joined farm channel when it belongs to `owner`, else null. */
 export function farmChannelFor(owner: string): Channel | null {
 	return farmChannel && farmOwner === owner ? farmChannel : null;
+}
+
+/** Loads cargo into or unloads it from the visited farm's train carts. */
+export function emitTrainAction(
+	owner: string,
+	action: TrainAction,
+	cb?: (res: Ack) => void,
+): void {
+	const channel = farmChannel;
+	if (!channel || farmOwner !== owner) {
+		cb?.({ ok: false, error: "not visiting farm" });
+		return;
+	}
+	channel
+		.push("trainAction", { action })
+		.receive("ok", () => cb?.({ ok: true }))
+		.receive("error", (payload: unknown) =>
+			cb?.({ ok: false, error: reasonOf(payload) ?? "Could not update the train" }),
+		)
+		.receive("timeout", () => cb?.({ ok: false, error: "Timed out" }));
 }
 
 /** Asks the visited farm to sleep, advancing a night when approved. */
