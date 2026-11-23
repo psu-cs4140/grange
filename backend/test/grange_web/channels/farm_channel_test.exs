@@ -243,6 +243,7 @@ defmodule GrangeWeb.FarmChannelTest do
 
   test "the owner can store and retrieve items from the barn" do
     FarmStore.ensure("Alice")
+    Barn.add("Alice", "tomato", 2)
 
     {:ok, _reply, socket} =
       signed_socket("Alice") |> subscribe_and_join(GrangeWeb.FarmChannel, "farm:Alice")

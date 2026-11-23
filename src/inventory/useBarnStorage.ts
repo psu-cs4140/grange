@@ -1,7 +1,12 @@
 import { useState } from "react";
 import { useGameStore } from "../store";
 import { emitBarnAction } from "../world/barnSocket";
-import { BARN_ITEM_LIMIT, EMPTY_STORAGE } from "./barnStorage";
+import {
+	BARN_ITEM_LIMIT,
+	EMPTY_STORAGE,
+	isBarnStorable,
+	isFarmMirroredItem,
+} from "./barnStorage";
 import {
 	freeSpaceFor,
 	type SlotRef,
@@ -31,6 +36,10 @@ export function useBarnStorage(owner: string): BarnStorageControls {
 		const slot = state[ref.area][ref.index];
 		if (!slot?.itemId || slot.count <= 0) return;
 		const item = slot.itemId;
+		if (!isBarnStorable(item)) {
+			setMessage("Buildings stay on the farm.");
+			return;
+		}
 		const room = BARN_ITEM_LIMIT - (storage[item] ?? 0);
 		if (room <= 0) {
 			setMessage("The barn is full.");
@@ -57,12 +66,16 @@ export function useBarnStorage(owner: string): BarnStorageControls {
 			return;
 		}
 		const amount = Math.min(stored, room);
+		// Farm-mirrored items (produce, livestock, supplies) return to the
+		// inventory through the farm broadcast; adding them here too would
+		// double the stack.
+		const mirrored = isFarmMirroredItem(item);
 		emitBarnAction(owner, { kind: "withdraw", item, count: amount }, (res) => {
 			if (!res.ok) {
 				setMessage(res.error ?? "Could not take the item.");
 				return;
 			}
-			useInventoryStore.getState().addItem(item, amount);
+			if (!mirrored) useInventoryStore.getState().addItem(item, amount);
 			setMessage(`Took ${amount} × ${getItemDef(item).name}.`);
 		});
 	}

@@ -587,6 +587,7 @@ single-use token machinery backs both email verification and password reset.
 │   │   ├── crops.ex           ← Elixir mirror of crop registry/mechanics
 │   │   ├── farm_action.ex     ← action opts + mutation drop roll
 │   │   ├── barn.ex / barn_item.ex
+│   │   ├── barn_storage.ex / barn_ledger.ex ← storage map + move into/out of ledgers
 │   │   ├── farm_fences.ex / farm_gates.ex / farm_props.ex
 │   │   ├── farm_gate_actions.ex ← visitor-safe gate toggle
 │   │   ├── npc_quest.ex / npc_quest_record.ex ← farmhand starter quest
@@ -628,7 +629,7 @@ single-use token machinery backs both email verification and password reset.
 | --- | --- | --- |
 | `users` | `id` string PK, `username` unique, `email` unique, `password_hash`, `balance` default 100, `is_admin` default false, `inserted_at` | IDs are 32-char lowercase hex strings. No `updated_at`. |
 | `sessions` | `token_hash` string PK, `user_id` FK → `users.id`, `expires_at`, `inserted_at` | Only the SHA-256 hash is stored. |
-| `farms` | `owner` string PK (username), `tomatoes` legacy integer, `fence_count` default 20, `gate_count` default 2, `storage` JSON map default `{}`, `sprinkler_count` default 0, `is_public` default false, `visitor_edit` default false, timestamps | Owner is the **username**, not `users.id`. Settings default to private/read-only. `storage` is the barn-storage container (`BarnStorage`), separate from `barn_items`. |
+| `farms` | `owner` string PK (username), `tomatoes` legacy integer, `fence_count` default 20, `gate_count` default 2, `storage` JSON map default `{}`, `sprinkler_count` default 0, `is_public` default false, `visitor_edit` default false, timestamps | Owner is the **username**, not `users.id`. Settings default to private/read-only. `storage` is the barn-storage container (`BarnStorage`); deposits move the stack out of its owning ledger (`BarnLedger`), so it is separate from `barn_items` but not a second copy. |
 | `tiles` | `id`, `owner` FK → `farms.owner`, `x`, `y`, `state` string, `crop` string, `planted_at`/`watered_at`/`ready_at`/`tilled_at` integer ms | Unique `(owner, x, y)`. `state` is one of `tilled`, `planted`, `watered`, `ready`. `tilled_at` is set while the tile is bare `tilled` ground so `FarmTick` can revert abandoned soil to grass. |
 | `barn_items` | `owner` FK, `item`, `count` | Unique `(owner, item)`. `item` is a crop id. |
 | `farm_fences` | `owner` FK, `x`, `y` | Unique `(owner, x, y)`. |
@@ -1014,6 +1015,36 @@ hour in normal play, shortened by `GRANGE_BREW_MS` in e2e). The farm tick calls
 `Brewing.finish_due/1`, which adds one finished drink to the barn and clears the
 batch. Outputs are `beer`, `tomato_juice`, and `lettuce_juice`; `barnSync`
 mirrors them into the inventory. Brewery actions are owner-only channel events.
+
+### 8.10 Barn storage
+
+Clicking the barn (or pressing `E` beside it) opens `BarnWindow`, a container
+backed by `farms.storage`. Shift-click a stack in either panel to move it across
+(player inventory → storage, storage → player inventory); drag also works, and a
+plain click on a stored stack takes it back. Hotbar and grid slots are
+equivalent. The container holds at most 24 distinct items and 999 of one item.
+Barn actions are owner-only channel events.
+
+Storage is a **move, not a copy**. `Grange.BarnStorage` applies each action in
+one transaction and `Grange.BarnLedger` takes the stack out of the container
+that authoritatively owns it:
+
+| Item | Moves out of / back into |
+| --- | --- |
+| seeds, materials | `inventory_items` (`Inventory.take/add`) |
+| produce, drinks | `barn_items` (`Barn.remove/add`) |
+| rods, fish | `player_items` (`PlayerItems.remove/add`) |
+| livestock | `farms.animals` |
+| fences, gates, sprinklers | `farms.fence_count` / `gate_count` / `sprinkler_count` |
+| tools | nothing (the saved layout is the record) |
+| buildings, decor, brewery | refused — their `farm_props` row is the spot |
+
+A stored stack is therefore not re-added by the client's inventory mirrors
+(`barnSync`, `useFarmObjectInventory`, the seed ledger), and it cannot be spent
+while it sits in storage. On withdrawal the farm broadcast puts mirrored items
+(farm `kind` `crop`, `drink`, `animal`, or `fence`/`gate`/`sprinkler`) back into
+the inventory; `useBarnStorage` only adds the non-mirrored items itself, so the
+stack cannot double.
 
 ---
 
@@ -1529,6 +1560,10 @@ them silently as part of an unrelated change; mention them in the PR.
   registry constant exists but no code path applies it.
 - `FarmStore` uses direct Ecto reads/writes; `notes/sqlite-plan.md`’s
   write-behind cache design is outdated.
+- Storing every hotbar/grid item empties the saved layout, so
+  `Inventory.ensure_layout/1` recreates the starter tools on the next fetch;
+  those tools reappear in the inventory while a copy still sits in barn storage.
+  Storing everything is not a supported state yet.
 - `farms.tomatoes` remains for compatibility and is read by the dashboard and
   farm HUD.
 - `FARM_HARVEST_YIELD` and `Farm.harvest_yield/0` are dead constants.

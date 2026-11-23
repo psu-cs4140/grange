@@ -22,8 +22,8 @@ defmodule Grange.Barn do
   end
 
   @doc "Removes `count` of `item`, or fails when the barn holds too little."
-  @spec sell(String.t(), String.t(), integer()) :: :ok | {:error, String.t()}
-  def sell(owner, item, count) when is_integer(count) and count > 0 do
+  @spec remove(String.t(), String.t(), integer()) :: :ok | {:error, String.t()}
+  def remove(owner, item, count) when is_integer(count) and count > 0 do
     case Repo.get_by(BarnItem, owner: owner, item: item) do
       %BarnItem{count: held} = row when held >= count ->
         row |> BarnItem.changeset(%{count: held - count}) |> Repo.update!()
@@ -33,6 +33,12 @@ defmodule Grange.Barn do
         {:error, "not enough #{item}"}
     end
   end
+
+  def remove(_owner, _item, _count), do: {:error, "invalid count"}
+
+  @doc "Removes produce as part of a sale; kept as the selling entry point."
+  @spec sell(String.t(), String.t(), integer()) :: :ok | {:error, String.t()}
+  def sell(owner, item, count), do: remove(owner, item, count)
 
   @doc "The owner's barn as a `%{item => count}` map."
   @spec map(String.t()) :: map()

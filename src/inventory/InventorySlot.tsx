@@ -21,9 +21,22 @@ interface Props {
 	keyHint?: string;
 	/** Called when a stack is dropped from barn storage onto this slot. */
 	onReceiveBarn?: (payload: BarnDragPayload) => void;
+	/**
+	 * Called when this slot is shift-clicked. The barn window passes its
+	 * deposit handler so shift-click stores the stack instead of moving it
+	 * between the hotbar and the grid.
+	 */
+	onShiftClick?: (ref: SlotRef) => void;
 }
 
-export function InventorySlot({ area, index, selected, keyHint, onReceiveBarn }: Props) {
+export function InventorySlot({
+	area,
+	index,
+	selected,
+	keyHint,
+	onReceiveBarn,
+	onShiftClick,
+}: Props) {
 	const slot = useInventoryStore((s) =>
 		area === "grid" ? s.grid[index] : s.hotbar[index],
 	);
@@ -61,9 +74,11 @@ export function InventorySlot({ area, index, selected, keyHint, onReceiveBarn }:
 	}
 
 	function onClick(e: React.MouseEvent) {
-		// Shift-click flings the whole stack to the other area (hotbar <-> grid).
+		// Shift-click flings the whole stack to the other area (hotbar <-> grid),
+		// or into the barn when the barn window owns the slot.
 		if (e.shiftKey) {
-			quickMove(ref);
+			if (onShiftClick) onShiftClick(ref);
+			else quickMove(ref);
 			return;
 		}
 		if (area === "hotbar") selectHotbar(index);

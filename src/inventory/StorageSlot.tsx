@@ -13,7 +13,7 @@ interface Props {
 	onDeposit: (from: SlotRef) => void;
 }
 
-/** One barn storage slot: click to take, or drop an inventory stack to store. */
+/** One barn storage slot: click or shift-click to take, or drop a stack to store. */
 export function StorageSlot({
 	index,
 	itemId,
@@ -57,7 +57,7 @@ export function StorageSlot({
 			data-testid={`barn-slot-${index}`}
 			data-item={itemId ?? ""}
 			data-count={count}
-			title={def ? `${def.name} — click to take` : "Empty storage slot"}
+			title={def ? `${def.name} — click or shift-click to take` : "Empty storage slot"}
 			className={`inv-slot${itemId ? " inv-slot-filled" : ""}`}
 			draggable={Boolean(itemId)}
 			onDragStart={onDragStart}

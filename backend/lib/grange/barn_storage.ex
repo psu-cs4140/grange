@@ -7,9 +7,14 @@ defmodule Grange.BarnStorage do
   the client can render one slot per stored item. Every accepted change is a
   single `farms.storage` write, so deposits and withdrawals persist across
   restarts.
+
+  A deposit also takes the stack out of the container that authoritatively owns
+  it, and a withdrawal returns it (`Grange.BarnLedger`). Storage is therefore a
+  move, never a copy: the client's inventory mirrors cannot re-add a stored
+  stack, and a stored stack cannot be spent by another action.
   """
 
-  alias Grange.{FarmRecord, Repo}
+  alias Grange.{BarnLedger, FarmRecord, Repo}
 
   @max_per_item 999
   @max_distinct 24
@@ -31,37 +36,58 @@ defmodule Grange.BarnStorage do
   @spec action(String.t(), map()) :: {:ok, :ok} | {:error, String.t()}
   def action(owner, %{"kind" => kind, "item" => item, "count" => count})
       when kind in ["deposit", "withdraw"] do
-    with :ok <- validate(item, count) do
-      case Repo.get(FarmRecord, owner) do
-        nil -> {:error, "farm not found"}
-        farm -> commit(farm, kind, item, count)
-      end
+    with :ok <- validate(kind, item, count) do
+      transact(owner, kind, item, count)
     end
   end
 
   def action(_owner, _action), do: {:error, "invalid barn action"}
 
-  defp validate(item, count) do
+  defp validate(kind, item, count) do
     cond do
-      not is_binary(item) or not Regex.match?(@item_format, item) -> {:error, "invalid item"}
-      not is_integer(count) or count < 1 or count > @max_per_item -> {:error, "invalid count"}
-      true -> :ok
+      not is_binary(item) or not Regex.match?(@item_format, item) ->
+        {:error, "invalid item"}
+
+      not is_integer(count) or count < 1 or count > @max_per_item ->
+        {:error, "invalid count"}
+
+      kind == "deposit" and not BarnLedger.storable?(item) ->
+        {:error, "buildings stay on the farm"}
+
+      true ->
+        :ok
     end
   end
 
-  defp commit(farm, kind, item, count) do
-    case move(inventory(farm), kind, item, count) do
-      {:ok, next} ->
-        farm
-        |> Ecto.Changeset.change(storage: next)
-        |> Repo.update!()
-
-        {:ok, :ok}
-
-      {:error, reason} ->
-        {:error, reason}
+  defp transact(owner, kind, item, count) do
+    case Repo.transaction(fn -> commit(owner, kind, item, count) end) do
+      {:ok, :ok} -> {:ok, :ok}
+      {:error, reason} when is_binary(reason) -> {:error, reason}
+      {:error, _reason} -> {:error, "could not update the barn"}
     end
   end
+
+  defp commit(owner, kind, item, count) do
+    case Repo.get(FarmRecord, owner) do
+      nil ->
+        Repo.rollback("farm not found")
+
+      farm ->
+        with {:ok, next} <- move(inventory(farm), kind, item, count),
+             :ok <- transfer(owner, kind, item, count) do
+          farm
+          |> Ecto.Changeset.change(storage: next)
+          |> Repo.update!()
+
+          :ok
+        else
+          {:error, reason} -> Repo.rollback(reason)
+        end
+    end
+  end
+
+  defp transfer(owner, "deposit", item, count), do: BarnLedger.take(owner, item, count)
+  defp transfer(owner, "withdraw", item, count), do: BarnLedger.give(owner, item, count)
 
   defp move(storage, "deposit", item, count) do
     current = Map.get(storage, item, 0)

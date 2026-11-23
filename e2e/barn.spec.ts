@@ -1,5 +1,11 @@
 import { expect, test, type Page } from "@playwright/test";
-import { clickWorld, registerFast, uniqueName, waitForWorld } from "./helpers";
+import {
+	BASE,
+	clickWorld,
+	registerFast,
+	uniqueName,
+	waitForWorld,
+} from "./helpers";
 
 /** Where the barn's sprite sits on the farm map (bottom-anchored). */
 const BARN = { x: 935, y: 200 };
@@ -32,11 +38,12 @@ test("the barn stores a stack and returns it to the inventory", async ({
 }) => {
 	await registerFast(page, uniqueName("Storer"));
 
-	// Select the seed-bag stack (hotbar slot 2) before opening the barn.
-	await page.keyboard.press("2");
 	await openBarn(page);
-	// Shift+E quick-moves the selected hotbar stack into storage.
-	await page.keyboard.press("Shift+E");
+	const barnHotbar = page.getByTestId("barn-player-hotbar");
+	// Shift-click any inventory stack to store it.
+	await barnHotbar
+		.getByTestId("slot-hotbar-1")
+		.click({ modifiers: ["Shift"] });
 	await expect(page.getByTestId("barn-slot-0")).toHaveAttribute(
 		"data-item",
 		"seed-bag",
@@ -47,7 +54,6 @@ test("the barn stores a stack and returns it to the inventory", async ({
 	);
 	await expect(page.getByTestId("barn-message")).toContainText("Stored 10");
 	// The stored stack left the player's hotbar slot.
-	const barnHotbar = page.getByTestId("barn-player-hotbar");
 	await expect(barnHotbar.getByTestId("slot-hotbar-1")).toHaveAttribute(
 		"data-item",
 		"",
@@ -83,9 +89,11 @@ test("standing at the barn and pressing E opens storage", async ({ page }) => {
 test("barn storage survives a reload", async ({ page }) => {
 	await registerFast(page, uniqueName("Keeper"));
 
-	await page.keyboard.press("2");
 	await openBarn(page);
-	await page.keyboard.press("Shift+E");
+	await page
+		.getByTestId("barn-player-hotbar")
+		.getByTestId("slot-hotbar-1")
+		.click({ modifiers: ["Shift"] });
 	await expect(page.getByTestId("barn-slot-0")).toHaveAttribute(
 		"data-item",
 		"seed-bag",
@@ -98,5 +106,118 @@ test("barn storage survives a reload", async ({ page }) => {
 	await expect(page.getByTestId("barn-slot-0")).toHaveAttribute(
 		"data-item",
 		"seed-bag",
+	);
+});
+
+test("shift-click moves a stack from the grid and back out of storage", async ({
+	page,
+}) => {
+	await registerFast(page, uniqueName("Shifter"));
+	await openBarn(page);
+
+	const playerGrid = page.getByTestId("barn-player-grid");
+	const playerHotbar = page.getByTestId("barn-player-hotbar");
+	const gridSlot = playerGrid.getByTestId("slot-grid-0");
+
+	// Split half the seed stack into the first grid slot.
+	await playerHotbar
+		.getByTestId("slot-hotbar-1")
+		.click({ button: "right" });
+	await expect(gridSlot).toHaveAttribute("data-item", "seed-bag");
+	await expect(gridSlot).toHaveAttribute("data-count", "5");
+
+	// A grid stack shift-clicks into storage just like a hotbar stack.
+	await gridSlot.click({ modifiers: ["Shift"] });
+	await expect(page.getByTestId("barn-slot-0")).toHaveAttribute(
+		"data-item",
+		"seed-bag",
+	);
+	await expect(page.getByTestId("barn-slot-0")).toHaveAttribute(
+		"data-count",
+		"5",
+	);
+	await expect(gridSlot).toHaveAttribute("data-item", "");
+
+	// Shift-clicking storage takes it back (and tops up the existing pile).
+	await page.getByTestId("barn-slot-0").click({ modifiers: ["Shift"] });
+	await expect(page.getByTestId("barn-slot-0")).toHaveAttribute(
+		"data-item",
+		"",
+	);
+	await expect(playerHotbar.getByTestId("slot-hotbar-1")).toHaveAttribute(
+		"data-count",
+		"10",
+	);
+});
+
+test("deposited produce is not mirrored back into the inventory", async ({
+	page,
+}) => {
+	await registerFast(page, uniqueName("Harvester"));
+
+	// Stock the barn through the dev hook; the owner's inventory mirrors it.
+	const seeded = await page.request.post(`${BASE}/api/dev/npc`, {
+		data: { barn: { tomato: 5 } },
+	});
+	expect(seeded.ok(), await seeded.text()).toBe(true);
+
+	// The produce lands in the first free hotbar slot (index 8, key 9).
+	const hudTomato = page.getByTestId("slot-hotbar-8");
+	await expect(hudTomato).toHaveAttribute("data-item", "tomato");
+	await expect(hudTomato).toHaveAttribute("data-count", "5");
+
+	await openBarn(page);
+	await page
+		.getByTestId("barn-player-hotbar")
+		.getByTestId("slot-hotbar-8")
+		.click({ modifiers: ["Shift"] });
+
+	await expect(page.getByTestId("barn-slot-0")).toHaveAttribute(
+		"data-item",
+		"tomato",
+	);
+	await expect(page.getByTestId("barn-slot-0")).toHaveAttribute(
+		"data-count",
+		"5",
+	);
+
+	// The farm broadcast used to re-add the deposited stack to the hotbar.
+	await page.waitForTimeout(500);
+	const playerHotbar = page.getByTestId("barn-player-hotbar");
+	await expect(playerHotbar.getByTestId("slot-hotbar-8")).toHaveAttribute(
+		"data-item",
+		"",
+	);
+
+	// A reload must not resurrect it from the barn ledger either.
+	await page.reload();
+	await waitForWorld(page);
+	await openBarn(page);
+	await expect(page.getByTestId("barn-slot-0")).toHaveAttribute(
+		"data-item",
+		"tomato",
+	);
+	await expect(page.getByTestId("barn-slot-0")).toHaveAttribute(
+		"data-count",
+		"5",
+	);
+	await expect(playerHotbar.getByTestId("slot-hotbar-8")).toHaveAttribute(
+		"data-item",
+		"",
+	);
+
+	// Taking it back restores exactly one stack, not two.
+	await page.getByTestId("barn-slot-0").click();
+	await expect(page.getByTestId("barn-slot-0")).toHaveAttribute(
+		"data-item",
+		"",
+	);
+	await expect(playerHotbar.getByTestId("slot-hotbar-8")).toHaveAttribute(
+		"data-item",
+		"tomato",
+	);
+	await expect(playerHotbar.getByTestId("slot-hotbar-8")).toHaveAttribute(
+		"data-count",
+		"5",
 	);
 });
