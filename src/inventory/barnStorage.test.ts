@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { BARN_SLOTS, barnEntries } from "./barnStorage";
-import { useInventoryStore } from "./inventoryStore";
-import { freeSpaceFor } from "./inventorySpace";
+import { freeSpaceFor, useInventoryStore } from "./inventoryStore";
 import { ITEMS } from "./items";
 
 beforeEach(() => {

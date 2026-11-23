@@ -21,6 +21,10 @@ defmodule GrangeWeb.Router do
     post("/auth/login", AuthController, :login)
     post("/auth/logout", AuthController, :logout)
     get("/auth/me", AuthController, :me)
+    post("/auth/verify-email", AuthController, :verify_email)
+    post("/auth/resend-verification", AuthController, :resend_verification)
+    post("/auth/request-password-reset", AuthController, :request_password_reset)
+    post("/auth/reset-password", AuthController, :reset_password)
 
     post("/economy/transaction", EconomyController, :transaction)
     post("/livestock/buy", LivestockController, :buy)
@@ -31,15 +35,22 @@ defmodule GrangeWeb.Router do
     get("/inventory", InventoryController, :index)
     put("/inventory", InventoryController, :replace)
     post("/inventory/buy", InventoryController, :buy)
+    post("/admin/item", InventoryController, :admin_grant)
 
     post("/hardware/buy", HardwareController, :buy)
 
     get("/state", HealthController, :state)
 
-    # Test hook: lets e2e runs start from a clean slate. Compiled out of
-    # production builds.
+    # Test hooks: let e2e runs start from a clean slate, jump the farmhand
+    # quest forward, and read back the verification/reset links the console
+    # mailer captured. Compiled out of production builds.
     if Application.compile_env(:grange, :enable_test_routes, false) do
       post("/reset", HealthController, :reset)
+      post("/dev/npc", DevController, :npc)
+      post("/dev/admin", DevController, :promote)
+      post("/dev/item", DevController, :item)
+      post("/dev/dawn", DevController, :dawn)
+      get("/auth/mailbox", AuthController, :mailbox)
     end
   end
 

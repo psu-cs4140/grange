@@ -2,7 +2,7 @@ defmodule Grange.AccountsTest do
   @moduledoc false
   use ExUnit.Case, async: false
 
-  alias Grange.Accounts
+  alias Grange.{Accounts, AdminAccounts, AuthToken}
 
   setup do
     Accounts.reset()
@@ -50,12 +50,58 @@ defmodule Grange.AccountsTest do
              register(%{"username" => "Bob"})
   end
 
-  test "authenticates with the right password only" do
-    {:ok, user} = register()
+  test "an unverified account cannot authenticate" do
+    {:ok, _user} = register()
 
-    assert {:ok, ^user} = Accounts.authenticate("Alice", "harvest-please")
+    assert {:error, :unverified} = Accounts.authenticate("Alice", "harvest-please")
+  end
+
+  test "authenticates with the right password only once verified" do
+    {:ok, user} = register()
+    {:ok, _} = Accounts.verify_email(AuthToken.issue(user.id, :verify_email))
+
+    assert {:ok, verified} = Accounts.authenticate("Alice", "harvest-please")
+    assert verified.id == user.id
     assert {:error, "invalid username or password"} = Accounts.authenticate("Alice", "wrong")
     assert {:error, "invalid username or password"} = Accounts.authenticate("Nobody", "whatever")
+  end
+
+  test "verify_email is single-use and stamps the account" do
+    {:ok, user} = register()
+    token = AuthToken.issue(user.id, :verify_email)
+
+    assert {:ok, verified} = Accounts.verify_email(token)
+    assert verified.email_verified_at
+
+    assert {:error, "this verification link is invalid or expired"} =
+             Accounts.verify_email(token)
+
+    assert {:error, _} = Accounts.verify_email("bogus")
+  end
+
+  test "reset_password validates before spending the link and clears sessions" do
+    {:ok, user} = register()
+    {:ok, _} = Accounts.verify_email(AuthToken.issue(user.id, :verify_email))
+    session = Accounts.create_session(user.id)
+
+    token = AuthToken.issue(user.id, :reset_password)
+    assert {:error, message} = Accounts.reset_password(token, "short")
+    assert message =~ "at least 8"
+
+    # The too-short attempt did not burn the link.
+    assert {:ok, _} = Accounts.reset_password(token, "brand-new-pass")
+
+    assert :error = Accounts.resolve_token(session)
+    assert {:ok, _} = Accounts.authenticate("Alice", "brand-new-pass")
+  end
+
+  test "resend and reset requests are uniform" do
+    {:ok, _user} = register()
+
+    assert :ok = Accounts.resend_verification("alice@example.test")
+    assert :ok = Accounts.resend_verification("nobody@example.test")
+    assert :ok = Accounts.request_password_reset("alice@example.test")
+    assert :ok = Accounts.request_password_reset("nobody@example.test")
   end
 
   test "session tokens resolve to the user and can be destroyed" do
@@ -156,7 +202,8 @@ defmodule Grange.AccountsTest do
   end
 
   test "grant_admin can reset the password so the login is known" do
-    {:ok, _user} = register()
+    {:ok, user} = register()
+    {:ok, _} = Accounts.verify_email(AuthToken.issue(user.id, :verify_email))
 
     assert {:ok, promoted} = Accounts.grant_admin("Alice", "brand-new-pass")
     assert promoted.is_admin
@@ -180,20 +227,20 @@ defmodule Grange.AccountsTest do
     test "creates the configured admin account idempotently" do
       set_admin_credentials("root", "root@example.test", "harvest-please")
 
-      assert {:ok, admin} = Accounts.ensure_admin()
+      assert {:ok, admin} = AdminAccounts.ensure_admin()
       assert admin.username == "root"
       assert admin.email == "root@example.test"
       assert admin.is_admin
       assert Accounts.admin?(admin.id)
 
-      assert {:ok, again} = Accounts.ensure_admin()
+      assert {:ok, again} = AdminAccounts.ensure_admin()
       assert again.id == admin.id
     end
 
     test "refuses to invent credentials when none are configured" do
       clear_admin_credentials()
 
-      assert {:error, message} = Accounts.ensure_admin()
+      assert {:error, message} = AdminAccounts.ensure_admin()
       assert message =~ "not configured"
       assert Accounts.list_users() == []
     end
@@ -201,7 +248,7 @@ defmodule Grange.AccountsTest do
     test "never falls back to the old default admin login" do
       clear_admin_credentials()
 
-      assert {:error, _message} = Accounts.ensure_admin()
+      assert {:error, _message} = AdminAccounts.ensure_admin()
       refute Enum.any?(Accounts.list_users(), &(&1.username == "admin"))
     end
 
@@ -211,7 +258,7 @@ defmodule Grange.AccountsTest do
 
       set_admin_credentials("root", "root@example.test", "harvest-please")
 
-      assert {:error, message} = Accounts.ensure_admin()
+      assert {:error, message} = AdminAccounts.ensure_admin()
       assert message =~ "email already belongs"
       refute reload(user.id).is_admin
     end
@@ -222,7 +269,7 @@ defmodule Grange.AccountsTest do
 
       set_admin_credentials("root", "root@example.test", "harvest-please")
 
-      assert {:error, message} = Accounts.ensure_admin()
+      assert {:error, message} = AdminAccounts.ensure_admin()
       assert message =~ "belongs to another account"
       refute reload(user.id).is_admin
     end
@@ -233,7 +280,7 @@ defmodule Grange.AccountsTest do
 
       set_admin_credentials("root", "root@example.test", "harvest-please")
 
-      assert {:ok, admin} = Accounts.ensure_admin()
+      assert {:ok, admin} = AdminAccounts.ensure_admin()
       assert admin.id == user.id
       assert admin.is_admin
       assert {:ok, _} = Accounts.authenticate("root", "harvest-please")

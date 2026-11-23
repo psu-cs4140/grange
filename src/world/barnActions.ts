@@ -1,3 +1,4 @@
+import type { ItemId } from "../inventory/items";
 import { isMovablePropAsset } from "./mapData";
 
 /**
@@ -7,7 +8,7 @@ import { isMovablePropAsset } from "./mapData";
  */
 export function opensBarn(
 	isOwner: boolean,
-	item: string | null,
+	item: ItemId | null,
 	asset: string | undefined,
 ): boolean {
 	if (!isOwner || asset !== "barn") return false;

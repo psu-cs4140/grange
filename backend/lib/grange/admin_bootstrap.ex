@@ -11,7 +11,7 @@ defmodule Grange.AdminBootstrap do
 
   require Logger
 
-  alias Grange.Accounts
+  alias Grange.AdminAccounts
 
   @doc "Creates the configured admin when the bootstrap is enabled and safe."
   @spec ensure() :: :ok
@@ -26,7 +26,7 @@ defmodule Grange.AdminBootstrap do
   defp development?, do: Application.get_env(:grange, :env) == :dev
 
   defp bootstrap do
-    case Accounts.ensure_admin() do
+    case AdminAccounts.ensure_admin() do
       {:ok, _admin} -> :ok
       {:error, reason} -> Logger.warning("admin bootstrap skipped: #{reason}")
     end

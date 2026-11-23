@@ -12,13 +12,39 @@ export function uniqueName(base: string): string {
 }
 
 /**
+ * Reads back the last email the dev console mailer captured for an address.
+ * Only available outside production, where real mail is sent instead.
+ */
+export async function mailboxFor(email: string): Promise<string> {
+	const res = await fetch(
+		`${BASE}/api/auth/mailbox?to=${encodeURIComponent(email)}`,
+	);
+	const body = (await res.json()) as { email?: { text: string } | null };
+	if (!body.email) throw new Error(`no mail captured for ${email}`);
+	return body.email.text;
+}
+
+/** Extracts a `token=` value from the mail line that contains `marker`. */
+export function tokenFrom(text: string, marker: string): string {
+	const line = text.split("\n").find((l) => l.includes(marker));
+	if (!line) throw new Error(`no ${marker} link in mail`);
+	const match = line.match(/token=([^\s&]+)/);
+	if (!match) throw new Error("no token in link");
+	return decodeURIComponent(match[1]);
+}
+
+/**
  * The world URL for an optional deep-link boot scene.
  *
- * `?area=` is only honored by the SPA when the Phoenix shell injected the
- * dev-only test-route meta tag, so normal play still starts on the farm.
+ * `?area=` and `?walk=` are only honored by the SPA when the Phoenix shell
+ * injected the dev-only test-route meta tag, so normal play still starts on the
+ * farm at normal speed.
  */
-export function worldUrl(area?: WorldSceneName): string {
-	return area ? `${BASE}/world?area=${area}` : `${BASE}/world`;
+export function worldUrl(area?: WorldSceneName, walk?: "normal"): string {
+	const query = [area ? `area=${area}` : null, walk ? `walk=${walk}` : null]
+		.filter(Boolean)
+		.join("&");
+	return query ? `${BASE}/world?${query}` : `${BASE}/world`;
 }
 
 /**
@@ -53,12 +79,18 @@ export async function registerAccount(
 	username: string,
 	password = TEST_PASSWORD,
 ): Promise<string> {
+	const email = `${username}@example.test`;
 	await page.goto(`${BASE}/login`);
 	await page.getByTestId("toggle-mode").click();
 	await page.getByTestId("username").fill(username);
-	await page.getByTestId("email").fill(`${username}@example.test`);
+	await page.getByTestId("email").fill(email);
 	await page.getByTestId("password").fill(password);
 	await page.getByRole("button", { name: /Create Account/i }).click();
+	await page.getByTestId("auth-notice").waitFor();
+
+	// Signup issues no session: open the emailed link the console mailer kept.
+	const token = tokenFrom(await mailboxFor(email), "/verify");
+	await page.goto(`${BASE}/verify?token=${encodeURIComponent(token)}`);
 	await page.waitForURL(`${BASE}/`);
 	await page.getByTestId("menu-user").waitFor();
 	return username;
@@ -82,6 +114,11 @@ export interface RegisterFastOptions {
 	password?: string;
 	/** Boot straight into this scene instead of the farm (dev-only hook). */
 	area?: WorldSceneName;
+	/**
+	 * `"normal"` keeps production walking speed instead of the e2e 3x speed.
+	 * Use it when the test has to read a prompt with a narrow radius.
+	 */
+	walk?: "normal";
 }
 
 /**
@@ -98,15 +135,29 @@ export async function registerFast(
 	options: RegisterFastOptions = {},
 ): Promise<string> {
 	const password = options.password ?? TEST_PASSWORD;
+	const email = `${username}@example.test`;
 	const response = await page.request.post(`${BASE}/api/auth/register`, {
-		data: { username, email: `${username}@example.test`, password },
+		data: { username, email, password },
 	});
 	if (!response.ok()) {
 		throw new Error(
 			`registering ${username} failed: ${response.status()} ${await response.text()}`,
 		);
 	}
-	await page.goto(worldUrl(options.area));
+
+	// Registration issues no session: consume the emailed verification link so
+	// the request's cookie jar holds a real session before we open the world.
+	const token = tokenFrom(await mailboxFor(email), "/verify");
+	const verified = await page.request.post(`${BASE}/api/auth/verify-email`, {
+		data: { token },
+	});
+	if (!verified.ok()) {
+		throw new Error(
+			`verifying ${username} failed: ${verified.status()} ${await verified.text()}`,
+		);
+	}
+
+	await page.goto(worldUrl(options.area, options.walk));
 	await waitForWorld(page);
 	return username;
 }

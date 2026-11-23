@@ -1,18 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
-import { registerFast, uniqueName, waitForWorld } from "./helpers";
+import { clickWorld, registerFast, uniqueName, waitForWorld } from "./helpers";
 
 /** Where the barn's sprite sits on the farm map (bottom-anchored). */
 const BARN = { x: 935, y: 200 };
-
-/** Clicks a world point on the farm canvas, like farm.spec.ts does. */
-async function clickWorld(page: Page, worldX: number, worldY: number) {
-	const box = await page.locator(".farm-map-canvas").boundingBox();
-	expect(box).not.toBeNull();
-	await page.mouse.click(
-		box!.x + (worldX / 1152) * box!.width,
-		box!.y + (worldY / 768) * box!.height,
-	);
-}
 
 /** Clicks the barn on the map and waits for the storage window. */
 async function openBarn(page: Page) {
