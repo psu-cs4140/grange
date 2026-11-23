@@ -21,7 +21,7 @@ defmodule GrangeWeb.InventoryController do
         FarmStore.ensure(user.username)
 
         seeds =
-          if user.is_admin,
+          if Accounts.admin?(user.id),
             do: Inventory.grant_all_seeds(user.username),
             else: Inventory.seeds(user.username)
 
@@ -63,7 +63,7 @@ defmodule GrangeWeb.InventoryController do
         unauthorized(conn)
 
       user ->
-        if user.is_admin do
+        if Accounts.admin?(user.id) do
           FarmStore.ensure(user.username)
           grant_admin_item(conn, user, params)
         else

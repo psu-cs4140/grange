@@ -8,6 +8,17 @@ config :grange, start_ticker: true
 # The global day/night clock broadcasts a snapshot every second in dev/prod.
 config :grange, start_world_clock: true
 
+# Automatic administrator creation is opt-in and disabled by default. Even when
+# enabled it never runs in production. Credentials must come from the
+# environment; there is no built-in default login.
+config :grange, start_admin: false
+config :grange, env: config_env()
+
+config :grange,
+  admin_username: nil,
+  admin_email: nil,
+  admin_password: nil
+
 config :grange, GrangeWeb.Endpoint,
   adapter: Bandit.PhoenixAdapter,
   url: [host: "localhost"],

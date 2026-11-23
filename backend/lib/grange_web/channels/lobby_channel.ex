@@ -80,11 +80,11 @@ defmodule GrangeWeb.LobbyChannel do
 
   defp items(socket) do
     case socket.assigns[:user] do
-      %{username: username, is_admin: true} ->
-        PlayerItems.grant_all_catalysts(username)
-        PlayerItems.map(username)
+      %{username: username} = user ->
+        # Re-read admin status from the database instead of trusting the socket.
+        if Accounts.admin?(Map.get(user, :id)),
+          do: PlayerItems.grant_all_catalysts(username)
 
-      %{username: username} ->
         PlayerItems.map(username)
 
       _ ->

@@ -20,7 +20,15 @@ defmodule Grange.Application do
         [GrangeWeb.Endpoint]
 
     opts = [strategy: :one_for_one, name: Grange.Supervisor]
-    Supervisor.start_link(children, opts)
+
+    # `Grange.Migrator` has already applied the migrations by the time the
+    # supervisor returns, so the Repo is ready for the admin bootstrap. The
+    # bootstrap is opt-in, development-only, and never falls back to default
+    # credentials; a missing credential logs a warning instead of failing boot.
+    with {:ok, supervisor} <- Supervisor.start_link(children, opts) do
+      Grange.AdminBootstrap.ensure()
+      {:ok, supervisor}
+    end
   end
 
   # The ticker is unnecessary in tests, which drive `FarmStore.tick/1` directly.

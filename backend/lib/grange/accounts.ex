@@ -139,11 +139,26 @@ defmodule Grange.Accounts do
   """
   @spec grant_admin(String.t(), String.t() | nil) :: {:ok, User.t()} | {:error, String.t()}
   def grant_admin(username, password) do
-    case Repo.get_by(User, username: username) do
-      nil -> {:error, "unknown user"}
-      %User{} = user -> promote(user, password)
+    with :ok <- validate_optional_password(password) do
+      case Repo.get_by(User, username: username) do
+        nil -> {:error, "unknown user"}
+        %User{} = user -> promote(user, password)
+      end
     end
   end
+
+  @doc """
+  True when the given account id belongs to a current administrator.
+
+  Callers should use this instead of trusting an `is_admin` value copied onto a
+  socket, token, or client payload.
+  """
+  @spec admin?(String.t() | nil) :: boolean()
+  def admin?(user_id) when is_binary(user_id) do
+    Repo.exists?(from(u in User, where: u.id == ^user_id and u.is_admin == true))
+  end
+
+  def admin?(_user_id), do: false
 
   @spec reset() :: :ok
   def reset do
@@ -337,6 +352,13 @@ defmodule Grange.Accounts do
         :ok
     end
   end
+
+  defp validate_optional_password(nil), do: :ok
+
+  defp validate_optional_password(password) when is_binary(password),
+    do: validate_password(password)
+
+  defp validate_optional_password(_password), do: {:error, "password must be a string"}
 
   defp validate_username(username) do
     if Regex.match?(@username_re, username) do
