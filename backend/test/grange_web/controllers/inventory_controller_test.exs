@@ -96,11 +96,11 @@ defmodule GrangeWeb.InventoryControllerTest do
     conn =
       json_post(conn, "/api/inventory/buy", %{"item" => "tomato-seed", "quantity" => 1})
 
-    assert %{"ok" => true, "balance" => 92, "seeds" => %{"seed-bag" => 11}} =
+    assert %{"ok" => true, "balance" => 88, "seeds" => %{"seed-bag" => 11}} =
              json_response(conn, 200)
 
     conn = conn |> recycle() |> get("/api/inventory")
-    assert %{"balance" => 92, "seeds" => %{"seed-bag" => 11}} = json_response(conn, 200)
+    assert %{"balance" => 88, "seeds" => %{"seed-bag" => 11}} = json_response(conn, 200)
   end
 
   test "buying rejects an unaffordable or unknown seed" do

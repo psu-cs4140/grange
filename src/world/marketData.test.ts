@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CROPS } from "../../shared/crops";
+import { CROPS, STANDARD_CROPS } from "../../shared/crops";
 import { FISH, FISH_ORDER, RODS, ROD_ORDER } from "./fishingData";
 import {
 	clampQuantity,
@@ -121,6 +121,31 @@ describe("market definitions", () => {
 		expect(clampQuantity(99, 10)).toBe(10);
 		expect(clampQuantity(3, 0)).toBe(1);
 		expect(clampQuantity(Number.NaN, 10)).toBe(1);
+	});
+});
+
+describe("crop economy", () => {
+	it("makes every standard crop profitable on its first harvest", () => {
+		for (const crop of STANDARD_CROPS) {
+			const def = CROPS[crop];
+			expect(def.seedCost).toBeGreaterThan(0);
+			expect(def.sellValue).toBeGreaterThan(def.seedCost);
+		}
+	});
+
+	it("pays more for rare variants than their standard family", () => {
+		expect(CROPS.midas_wheat.sellValue).toBeGreaterThan(CROPS.wheat.sellValue);
+		expect(CROPS.frost_lettuce.sellValue).toBeGreaterThan(
+			CROPS.lettuce.sellValue,
+		);
+		expect(CROPS.sunburst_tomato.sellValue).toBeGreaterThan(
+			CROPS.tomato.sellValue,
+		);
+	});
+
+	it("rewards a tomato's second harvest more than a lettuce crop", () => {
+		const tomatoTotal = CROPS.tomato.sellValue * CROPS.tomato.harvests;
+		expect(tomatoTotal).toBeGreaterThan(CROPS.lettuce.sellValue);
 	});
 });
 

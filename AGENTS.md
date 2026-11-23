@@ -953,8 +953,8 @@ quest state rides on the `farm:<owner>` join reply as `npc`, and visitors get
   his thanks gets its own client-only screen (dismissed with Esc, ×, or "Got
   it") before the lettuce/wheat menu appears.
 - Stage `supplies`: he wants ten lettuce and ten wheat, sold one batch at a
-  time, and sells repeatable ten-seed bundles at market price (40 GC lettuce,
-  20 GC wheat). Both hand-ins advance to `complete`.
+  time, and sells repeatable ten-seed bundles at market price (60 GC lettuce,
+  30 GC wheat). Both hand-ins advance to `complete`.
 - Stage `complete`: he delivers the "meet me at the market" line and the
   rectangle disappears. There is no marketplace cameo yet.
 

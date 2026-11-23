@@ -120,7 +120,7 @@ test("the market stalls open their buy and sell views", async ({ page }) => {
 		"Tomato Seeds",
 	);
 	await expect(page.getByTestId("market-price-tomato-seed")).toContainText(
-		"8 GC",
+		"12 GC",
 	);
 	await expect(page.getByTestId("market-inventory-grid")).toBeVisible();
 	// The numeric hotbar stays docked while the shop is open.
@@ -131,7 +131,7 @@ test("the market stalls open their buy and sell views", async ({ page }) => {
 	await expect(page.getByTestId("farm-balance")).toContainText("100");
 
 	await page.getByTestId("market-buy-tomato-seed").click();
-	await expect(page.getByTestId("farm-balance")).toContainText("92");
+	await expect(page.getByTestId("farm-balance")).toContainText("88");
 	// Seeds land in the tomato seed stack in the hotbar.
 	await expect(page.getByTestId("slot-hotbar-1")).toHaveAttribute(
 		"data-count",
@@ -265,7 +265,7 @@ test("selling a harvested tomato credits the wallet", async ({ page }) => {
 	await expect(page.getByTestId("market-stock-tomato")).toContainText(
 		"STOCK: 0",
 	);
-	await expect(page.getByTestId("farm-balance")).toContainText("105");
+	await expect(page.getByTestId("farm-balance")).toContainText("115");
 	await expect(page.getByTestId("market-sell-tomato")).toBeDisabled();
 	await expect(page.getByTestId("market-sellall-tomato")).toBeDisabled();
 	// Selling also clears it from the local inventory, so it can't linger.

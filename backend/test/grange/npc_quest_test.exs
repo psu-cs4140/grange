@@ -91,7 +91,7 @@ defmodule Grange.NpcQuestTest do
     assert done.wheat == 10
     assert stock("Alice", "lettuce") == 0
     assert stock("Alice", "wheat") == 0
-    assert balance("Alice") == 100 + 70 + 40
+    assert balance("Alice") == 100 + 120 + 60
   end
 
   test "a completed quest refuses further trades and stays complete" do

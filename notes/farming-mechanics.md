@@ -9,9 +9,9 @@ If you change a value, change it in both places and update this table.
 
 | Crop Name | ID | Tier | Stages | Seed Cost | Sell Value | Harvest Tool | Regrowth | Unique Grid Mechanic (Orthogonal `N, S, E, W`) | Synergy Condition |
 | :--- | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :--- | :--- |
-| **Wheat** | `wheat` | Standard | 5 (`0`–`4`) | 2c | 4c | **Scythe Only** | Single harvest | **Pack Mentality:** `+5%` growth speed per adjacent Wheat/Midas Wheat (max `+20%`). | Adjacent to `>= 2` Wheat tiles |
-| **Lettuce** | `lettuce` | Standard | 5 (`0`–`4`) | 4c | 7c | Hand or Scythe | Single harvest | **Moisture Sponge:** while watered, its 4 orthogonal neighbors decay moisture `25%` slower. | Hydrating `>= 1` adjacent crop |
-| **Tomato** | `tomato` | Standard | 5 (`0`–`4`) | 8c | 5c *(x2 = 10c)* | Hand or Scythe | `2` harvests *(regrows from Stage `2`)* | **Space-Hungry:** `-20%` growth speed if touching any Tomato; `+15%` growth speed if touching any Lettuce. | Adjacent to `>= 1` Lettuce and `0` Tomatoes |
+| **Wheat** | `wheat` | Standard | 5 (`0`–`4`) | 3c | 6c | **Scythe Only** | Single harvest | **Pack Mentality:** `+5%` growth speed per adjacent Wheat/Midas Wheat (max `+20%`). | Adjacent to `>= 2` Wheat tiles |
+| **Lettuce** | `lettuce` | Standard | 5 (`0`–`4`) | 6c | 12c | Hand or Scythe | Single harvest | **Moisture Sponge:** while watered, its 4 orthogonal neighbors decay moisture `25%` slower. | Hydrating `>= 1` adjacent crop |
+| **Tomato** | `tomato` | Standard | 5 (`0`–`4`) | 12c | 15c *(x2 = 30c)* | Hand or Scythe | `2` harvests *(regrows from Stage `2`)* | **Space-Hungry:** `-20%` growth speed if touching any Tomato; `+15%` growth speed if touching any Lettuce. | Adjacent to `>= 1` Lettuce and `0` Tomatoes |
 | **Midas Wheat** | `midas_wheat` | Rare Catalyst | 4 (`0`–`3`) | *Catalyst Only* | 30c | **Scythe Only** | Single harvest | **Combo Booster:** grants `+3` to `comboCount` and refreshes the timer on harvest. Counts toward Wheat adjacency. | *N/A (Mutant)* |
 | **Frost-Crisp Lettuce** | `frost_lettuce` | Rare Catalyst | 4 (`0`–`3`) | *Catalyst Only* | 45c | Hand or Scythe | Single harvest | **Living Sprinkler:** while left unharvested at Stage `3`, waters all 4 orthogonal neighbors at the start of each cycle. | *N/A (Mutant)* |
 | **Sun-Burst Tomato** | `sunburst_tomato` | Rare Catalyst | 3 (`0`–`2`) | *Catalyst Only* | 24c *(x3 = 72c)* | Hand or Scythe | `3` harvests *(regrows from Stage `1`)* | **Self-Seeding:** the registry declares a `10%` bonus seed roll, but the harvest path does not apply it yet. | *N/A (Mutant)* |
@@ -93,12 +93,12 @@ the production release.
 
 - Harvesting increments the barn row for the harvested crop by 1.
 - The market's **Seed** stall sells one seed per standard crop (priced from
-  `CROPS[*].seedCost`): wheat `2c`, lettuce `4c`, tomato `8c`. Each seed card
+  `CROPS[*].seedCost`): wheat `3c`, lettuce `6c`, tomato `12c`. Each seed card
   uses the same quantity stepper as the produce sell control, capped at what the
   player can afford and can hold, so seeds can be bought in bulk in a single
   transaction.
 - The market's **Produce** stall sells each of the six produce items at
-  `CROPS[*].sellValue`: wheat `4c`, lettuce `7c`, tomato `5c`, Midas Wheat
+`CROPS[*].sellValue`: wheat `6c`, lettuce `12c`, tomato `15c`, Midas Wheat
   `30c`, Frost-Crisp Lettuce `45c`, Sun-Burst Tomato `24c`.
 - Selling decrements the barn row; the client reconciles its inventory to the
   barn on every farm snapshot, so a sold item disappears from the inventory too.

@@ -51,7 +51,7 @@ describe("npcWantedCrops", () => {
 describe("npcSellCards", () => {
 	it("pays the market price for a full batch", () => {
 		const [tomato] = npcSellCards(status(), { tomato: NPC_GOAL });
-		expect(tomato.payout).toBe(50);
+		expect(tomato.payout).toBe(150);
 		expect(tomato.ready).toBe(true);
 	});
 
@@ -74,8 +74,8 @@ describe("npcSellCards", () => {
 			wheat: 10,
 		});
 		expect(cards.map((card) => [card.crop, card.payout])).toEqual([
-			["lettuce", 70],
-			["wheat", 40],
+			["lettuce", 120],
+			["wheat", 60],
 		]);
 	});
 
@@ -90,8 +90,8 @@ describe("npcSeedOffers", () => {
 		expect(
 			offers.map((offer) => [offer.marketItemId, offer.quantity, offer.price]),
 		).toEqual([
-			["lettuce-seed", 10, 40],
-			["wheat-seed", 10, 20],
+			["lettuce-seed", 10, 60],
+			["wheat-seed", 10, 30],
 		]);
 	});
 
@@ -115,7 +115,7 @@ describe("npcSellLabel", () => {
 		const [short] = npcSellCards(status(), { tomato: 3 });
 		const [ready] = npcSellCards(status(), { tomato: NPC_GOAL });
 		expect(npcSellLabel(short)).toBe("3 / 10");
-		expect(npcSellLabel(ready)).toContain("50 GC");
+		expect(npcSellLabel(ready)).toContain("150 GC");
 	});
 });
 

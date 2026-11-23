@@ -55,7 +55,7 @@ defmodule Grange.InventoryTest do
     FarmStore.ensure(user.username)
 
     assert {:ok, result} = Inventory.buy(user, "tomato-seed", 1)
-    assert result.balance == 92
+    assert result.balance == 88
     assert result.seeds["seed-bag"] == 11
     assert Inventory.seeds(user.username)["seed-bag"] == 11
   end

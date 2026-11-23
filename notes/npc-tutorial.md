@@ -36,14 +36,14 @@ supplies an amount.
 
 | Crop | Market sell | Batch payout |
 | --- | ---: | ---: |
-| Tomato | 5 | 50 GC |
-| Lettuce | 7 | 70 GC |
-| Wheat | 4 | 40 GC |
+| Tomato | 15 | 150 GC |
+| Lettuce | 12 | 120 GC |
+| Wheat | 6 | 60 GC |
 
 | Seed bundle | Market seed cost | Bundle price |
 | --- | ---: | ---: |
-| Lettuce | 4 | 40 GC |
-| Wheat | 2 | 20 GC |
+| Lettuce | 6 | 60 GC |
+| Wheat | 3 | 30 GC |
 
 Seed bundles are repeatable and go through `/api/inventory/buy`, the same
 endpoint the market uses, so they respect the server's stock cap and balance.

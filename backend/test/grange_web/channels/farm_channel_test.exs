@@ -250,7 +250,7 @@ defmodule GrangeWeb.FarmChannelTest do
     NpcQuest.force("Alice", %{"stage" => "tomatoes"})
 
     ref = push(socket, "npcSell", %{"item" => "tomato"})
-    assert_reply(ref, :ok, %{npc: %{stage: "supplies", tomatoes: 10}, balance: 150})
+    assert_reply(ref, :ok, %{npc: %{stage: "supplies", tomatoes: 10}, balance: 250})
     assert_broadcast("farmUpdate", %{farm: %{barn: %{"tomato" => 0}}})
   end
 
