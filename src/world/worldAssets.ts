@@ -14,6 +14,7 @@ import {
 } from "./resources";
 import { sprinklerResources } from "./sprinklerResources";
 import type { WorldSceneName } from "./WalkingScene";
+import { waltImages } from "./waltSprites";
 
 function unique(groups: ex.ImageSource[][]): ex.ImageSource[] {
 	return [...new Set(groups.flat())];
@@ -27,7 +28,7 @@ function unique(groups: ex.ImageSource[][]): ex.ImageSource[] {
  * versa. Scenes now load only what they draw, and the rest stream in behind the
  * first frame (see `preloadWorldResources`).
  */
-const farmAssets = unique([resources, sprinklerResources, animalAnimationResources]);
+const farmAssets = unique([resources, sprinklerResources, animalAnimationResources, waltImages]);
 
 /** The shared player sprite every scene draws. */
 const avatarAssets = [farmerImage];
