@@ -1,25 +1,53 @@
 import { expect, test } from "@playwright/test";
 import {
 	BASE,
-	enterFarm,
 	login,
+	mailboxFor,
 	register,
 	registerAccount,
+	tokenFrom,
 	uniqueName,
 	waitForWorld,
 } from "./helpers";
 
-test("a new account registers, lands on the main menu, then enters the farm", async ({
-	page,
-}) => {
+test("a new account verifies and lands on its farm", async ({ page }) => {
 	const name = uniqueName("Sprout");
 	await registerAccount(page, name);
 
-	await expect(page).toHaveURL(`${BASE}/`);
-	await expect(page.getByTestId("menu-user")).toContainText(name);
-
-	await enterFarm(page);
 	await expect(page).toHaveURL(/\/world$/);
+	await page.keyboard.press("Escape");
+	await expect(page.getByTestId("farm-map-user")).toContainText(name);
+});
+
+test("verifying a new account celebrates before entering the farm", async ({
+	page,
+}) => {
+	const name = uniqueName("Sprout");
+	const email = `${name}@example.test`;
+	await page.goto(`${BASE}/login`);
+	await page.getByTestId("toggle-mode").click();
+	await page.getByTestId("username").fill(name);
+	await page.getByTestId("email").fill(email);
+	await page.getByTestId("password").fill("long-enough-pass");
+	await page.getByRole("button", { name: /Create Account/i }).click();
+	await expect(page.getByTestId("auth-notice")).toBeVisible();
+
+	// The emailed link signs the account in and celebrates the new farm.
+	const token = tokenFrom(await mailboxFor(email), "/verify");
+	await page.goto(`${BASE}/verify?token=${encodeURIComponent(token)}`);
+
+	const dialog = page.getByTestId("account-created");
+	await expect(dialog).toBeVisible();
+	await expect(dialog).toContainText(/account created/i);
+	await expect(dialog).toContainText(name);
+	await expect(page.getByTestId("account-created-video")).toHaveAttribute(
+		"src",
+		/account-created\.mp4$/,
+	);
+
+	await page.getByTestId("account-created-continue").click();
+	await expect(page).toHaveURL(/\/world$/);
+	await waitForWorld(page);
 	await page.keyboard.press("Escape");
 	await expect(page.getByTestId("farm-map-user")).toContainText(name);
 });
