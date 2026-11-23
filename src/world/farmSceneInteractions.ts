@@ -22,6 +22,7 @@ export interface FarmInteractionArgs {
 	fishing: FarmFishing;
 	farmProps: FarmPropLayer;
 	farm: ActiveFarm | null;
+	step: number;
 	npc?: FarmNpc;
 	onTalkToNpc: () => void;
 	onOpenHouse: () => void;
@@ -32,15 +33,18 @@ export interface FarmInteractionArgs {
 export function updateFarmInteractions(args: FarmInteractionArgs): void {
 	const gate = nearbyGate(args.farm?.gates ?? [], args.player.pos);
 	const house = args.farmProps.position("farmhouse");
-	const npc = shouldShowNpc(args.isOwner) ? npcAnchor(house) : null;
-	args.npc?.place(npc);
+	const home = shouldShowNpc(args.isOwner) ? npcAnchor(house) : null;
+	const npc = args.npc?.update(home, args.player.pos, args.step, args.farm?.land_level ?? 0) ?? null;
 	args.travel.update(
 		args.player,
 		args.input,
 		args.train,
 		gate?.prompt ?? args.barn.prompt(args.player, args.farmProps),
 		npcPrompt(args.player.pos, npc),
-		args.onTalkToNpc,
+		() => {
+			args.npc?.talkTo(args.player.pos);
+			args.onTalkToNpc();
+		},
 		args.travel.housePrompt(args.isOwner, args.player.pos, house),
 		args.onOpenHouse,
 	);

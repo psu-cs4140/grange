@@ -267,6 +267,7 @@ export class FarmMapScene extends ex.Scene<SceneActivationData> {
 			farmProps: this.farmProps,
 			farm,
 			npc: this.npc,
+			step,
 			onTalkToNpc: this.onTalkToNpc,
 			onOpenHouse: this.onOpenHouse,
 			report: (message) => this.hud.report(message),
